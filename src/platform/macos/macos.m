@@ -111,12 +111,16 @@ NSColor *nscolor_from_hex(const char *str)
 
 void osx_copy_selection()
 {
-	int shifted;
-
-	send_key(osx_input_lookup_code("leftmeta", &shifted), 1);
-	send_key(osx_input_lookup_code("c", &shifted), 1);
-	send_key(osx_input_lookup_code("leftmeta", &shifted), 0);
-	send_key(osx_input_lookup_code("c", &shifted), 0);
+	/*
+	 * Send Cmd+C using hardcoded keycodes.
+	 * Note: On non-Latin keyboard layouts (e.g., Hebrew), copy may not work
+	 * in terminals using Kitty keyboard protocol due to how they handle
+	 * synthetic key events.
+	 */
+	send_key(56, 1);  /* Command down */
+	send_key(9, 1);   /* 'c' down */
+	send_key(9, 0);   /* 'c' up */
+	send_key(56, 0);  /* Command up */
 }
 
 void osx_scroll(int direction)
