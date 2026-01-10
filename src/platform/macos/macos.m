@@ -109,14 +109,92 @@ NSColor *nscolor_from_hex(const char *str)
 					 alpha:(float)a / 255];
 }
 
+static int is_kitty_terminal(void)
+{
+	const char *kitty_window_id = getenv("KITTY_WINDOW_ID");
+	if (kitty_window_id != NULL && kitty_window_id[0] != '\0')
+		return 1;
+
+	const char *term = getenv("TERM");
+	if (term != NULL && strcmp(term, "xterm-kitty") == 0)
+		return 1;
+
+	return 0;
+}
+
+static CFStringRef get_selected_text_via_accessibility(void)
+{
+	AXUIElementRef systemWideElement = AXUIElementCreateSystemWide();
+	if (!systemWideElement)
+		return NULL;
+
+	AXUIElementRef focusedApp = NULL;
+	AXError error = AXUIElementCopyAttributeValue(
+		systemWideElement, kAXFocusedApplicationAttribute, (CFTypeRef *)&focusedApp);
+	CFRelease(systemWideElement);
+
+	if (error != kAXErrorSuccess || !focusedApp)
+		return NULL;
+
+	AXUIElementRef focusedElement = NULL;
+	error = AXUIElementCopyAttributeValue(
+		focusedApp, kAXFocusedUIElementAttribute, (CFTypeRef *)&focusedElement);
+	CFRelease(focusedApp);
+
+	if (error != kAXErrorSuccess || !focusedElement)
+		return NULL;
+
+	CFStringRef selectedText = NULL;
+	error = AXUIElementCopyAttributeValue(
+		focusedElement, kAXSelectedTextAttribute, (CFTypeRef *)&selectedText);
+	CFRelease(focusedElement);
+
+	if (error != kAXErrorSuccess)
+		return NULL;
+
+	return selectedText;
+}
+
+static int write_to_clipboard(CFStringRef text)
+{
+	if (!text)
+		return 0;
+
+	NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+	[pasteboard clearContents];
+
+	NSString *nsText = (__bridge NSString *)text;
+	return [pasteboard setString:nsText forType:NSPasteboardTypeString] ? 1 : 0;
+}
+
+static int copy_via_accessibility(void)
+{
+	CFStringRef selectedText = get_selected_text_via_accessibility();
+	if (!selectedText || CFStringGetLength(selectedText) == 0) {
+		if (selectedText) CFRelease(selectedText);
+		return 0;
+	}
+
+	int result = write_to_clipboard(selectedText);
+	CFRelease(selectedText);
+	return result;
+}
+
 void osx_copy_selection()
 {
 	/*
-	 * Send Cmd+C using hardcoded keycodes.
-	 * Note: On non-Latin keyboard layouts (e.g., Hebrew), copy may not work
-	 * in terminals using Kitty keyboard protocol due to how they handle
-	 * synthetic key events.
+	 * For Kitty terminal with non-Latin keyboard layouts:
+	 * Kitty's keyboard protocol interprets keycodes based on current layout,
+	 * causing synthetic Cmd+C to produce wrong characters. Use Accessibility
+	 * API to read selected text directly and write to clipboard.
 	 */
+	if (is_kitty_terminal()) {
+		if (copy_via_accessibility())
+			return;
+		fprintf(stderr, "warpd: Accessibility-based copy failed, falling back\n");
+	}
+
+	/* Standard approach for non-Kitty terminals */
 	send_key(56, 1);  /* Command down */
 	send_key(9, 1);   /* 'c' down */
 	send_key(9, 0);   /* 'c' up */
