@@ -80,7 +80,7 @@ void window_register_draw_hook(struct window *win,
 			       void *arg);
 
 struct window *create_window(const char *color, size_t w, size_t h);
-struct window *create_overlay_window();
+struct window *create_overlay_window(int x, int y, int w, int h);
 
 void macos_init_input();
 void macos_init_mouse();

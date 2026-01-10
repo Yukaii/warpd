@@ -524,6 +524,7 @@ static void update_keymap()
 
 	}
 
+	CFRelease(kbd);
 	pthread_mutex_unlock(&keymap_mtx);
 }
 

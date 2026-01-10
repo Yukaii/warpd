@@ -109,22 +109,29 @@ NSColor *nscolor_from_hex(const char *str)
 					 alpha:(float)a / 255];
 }
 
-static int is_focused_app_kitty(void)
+/* Returns the focused application. Caller must CFRelease the result. */
+static AXUIElementRef get_focused_app(void)
 {
 	AXUIElementRef systemWideElement = AXUIElementCreateSystemWide();
 	if (!systemWideElement)
-		return 0;
+		return NULL;
 
 	AXUIElementRef focusedApp = NULL;
-	AXError error = AXUIElementCopyAttributeValue(
+	AXUIElementCopyAttributeValue(
 		systemWideElement, kAXFocusedApplicationAttribute, (CFTypeRef *)&focusedApp);
 	CFRelease(systemWideElement);
 
-	if (error != kAXErrorSuccess || !focusedApp)
+	return focusedApp;
+}
+
+static int is_focused_app_kitty(void)
+{
+	AXUIElementRef focusedApp = get_focused_app();
+	if (!focusedApp)
 		return 0;
 
 	pid_t pid;
-	error = AXUIElementGetPid(focusedApp, &pid);
+	AXError error = AXUIElementGetPid(focusedApp, &pid);
 	CFRelease(focusedApp);
 
 	if (error != kAXErrorSuccess)
@@ -143,20 +150,12 @@ static int is_focused_app_kitty(void)
 
 static CFStringRef get_selected_text_via_accessibility(void)
 {
-	AXUIElementRef systemWideElement = AXUIElementCreateSystemWide();
-	if (!systemWideElement)
-		return NULL;
-
-	AXUIElementRef focusedApp = NULL;
-	AXError error = AXUIElementCopyAttributeValue(
-		systemWideElement, kAXFocusedApplicationAttribute, (CFTypeRef *)&focusedApp);
-	CFRelease(systemWideElement);
-
-	if (error != kAXErrorSuccess || !focusedApp)
+	AXUIElementRef focusedApp = get_focused_app();
+	if (!focusedApp)
 		return NULL;
 
 	AXUIElementRef focusedElement = NULL;
-	error = AXUIElementCopyAttributeValue(
+	AXError error = AXUIElementCopyAttributeValue(
 		focusedApp, kAXFocusedUIElementAttribute, (CFTypeRef *)&focusedElement);
 	CFRelease(focusedApp);
 

@@ -21,8 +21,6 @@ static int dragging = 0;
 }
 @end
 
-static CursorHider *hider = NULL;
-
 static long get_time_ms()
 {
 	struct timespec ts;
@@ -247,6 +245,4 @@ void macos_init_mouse()
 				 _CGSDefaultConnection(), propertyString,
 				 kCFBooleanTrue);
 	CFRelease(propertyString);
-
-	hider = [CursorHider alloc];
 }
