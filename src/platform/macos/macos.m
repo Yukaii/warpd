@@ -109,14 +109,33 @@ NSColor *nscolor_from_hex(const char *str)
 					 alpha:(float)a / 255];
 }
 
-static int is_kitty_terminal(void)
+static int is_focused_app_kitty(void)
 {
-	const char *kitty_window_id = getenv("KITTY_WINDOW_ID");
-	if (kitty_window_id != NULL && kitty_window_id[0] != '\0')
-		return 1;
+	AXUIElementRef systemWideElement = AXUIElementCreateSystemWide();
+	if (!systemWideElement)
+		return 0;
 
-	const char *term = getenv("TERM");
-	if (term != NULL && strcmp(term, "xterm-kitty") == 0)
+	AXUIElementRef focusedApp = NULL;
+	AXError error = AXUIElementCopyAttributeValue(
+		systemWideElement, kAXFocusedApplicationAttribute, (CFTypeRef *)&focusedApp);
+	CFRelease(systemWideElement);
+
+	if (error != kAXErrorSuccess || !focusedApp)
+		return 0;
+
+	pid_t pid;
+	error = AXUIElementGetPid(focusedApp, &pid);
+	CFRelease(focusedApp);
+
+	if (error != kAXErrorSuccess)
+		return 0;
+
+	NSRunningApplication *app = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+	if (!app)
+		return 0;
+
+	NSString *bundleId = [app bundleIdentifier];
+	if (bundleId && [bundleId isEqualToString:@"net.kovidgoyal.kitty"])
 		return 1;
 
 	return 0;
@@ -188,7 +207,7 @@ void osx_copy_selection()
 	 * causing synthetic Cmd+C to produce wrong characters. Use Accessibility
 	 * API to read selected text directly and write to clipboard.
 	 */
-	if (is_kitty_terminal()) {
+	if (is_focused_app_kitty()) {
 		if (copy_via_accessibility())
 			return;
 		fprintf(stderr, "warpd: Accessibility-based copy failed, falling back\n");
@@ -197,8 +216,8 @@ void osx_copy_selection()
 	/* Standard approach for non-Kitty terminals */
 	send_key(56, 1);  /* Command down */
 	send_key(9, 1);   /* 'c' down */
+	send_key(56, 0);  /* Command up (released before 'c' to match original) */
 	send_key(9, 0);   /* 'c' up */
-	send_key(56, 0);  /* Command up */
 }
 
 void osx_scroll(int direction)
