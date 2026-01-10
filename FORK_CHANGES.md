@@ -63,6 +63,20 @@ Modified `input_parse_string()` in `src/input.c` to use QWERTY-based lookup for 
 **Files modified:**
 - `src/platform/macos/macos.m`
 
+### 5. Code cleanup (`2668918`)
+
+**Fixes:**
+- Memory leak: Added missing `CFRelease(kbd)` in `update_keymap()` - leaked on every keyboard layout change
+- Consolidated duplicate accessibility API code into `get_focused_app()` helper
+- Removed unused `hider` variable in mouse.m
+- Fixed header signature mismatch for `create_overlay_window()`
+
+**Files modified:**
+- `src/platform/macos/input.m`
+- `src/platform/macos/macos.m`
+- `src/platform/macos/mouse.m`
+- `src/platform/macos/macos.h`
+
 ## Compatibility
 
 These changes are backward compatible:
