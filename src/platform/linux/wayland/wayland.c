@@ -60,12 +60,87 @@ const char *way_input_lookup_name(uint8_t code, int shifted)
 		name = keymap[code].shifted_name;
 	else if (!shifted && keymap[code].name[0])
 		name = keymap[code].name;
-	
+
 	for (i = 0; i < sizeof normalization_map / sizeof normalization_map[0]; i++)
 		if (name && !strcmp(normalization_map[i].xname, name))
 			name = normalization_map[i].name;
 
 	return name;
+}
+
+/*
+ * Returns the QWERTY character for a keycode, independent of current layout.
+ * This is used by hint mode to match keypresses regardless of keyboard layout.
+ * Linux uses evdev keycodes which are hardware-based.
+ */
+char way_input_code_to_qwerty(uint8_t code)
+{
+	/* Map from evdev keycode to QWERTY character */
+	static const char qwerty_map[256] = {
+		[2]  = '1', [3]  = '2', [4]  = '3', [5]  = '4', [6]  = '5',
+		[7]  = '6', [8]  = '7', [9]  = '8', [10] = '9', [11] = '0',
+		[12] = '-', [13] = '=',
+		[16] = 'q', [17] = 'w', [18] = 'e', [19] = 'r', [20] = 't',
+		[21] = 'y', [22] = 'u', [23] = 'i', [24] = 'o', [25] = 'p',
+		[26] = '[', [27] = ']',
+		[30] = 'a', [31] = 's', [32] = 'd', [33] = 'f', [34] = 'g',
+		[35] = 'h', [36] = 'j', [37] = 'k', [38] = 'l', [39] = ';',
+		[40] = '\'', [41] = '`', [43] = '\\',
+		[44] = 'z', [45] = 'x', [46] = 'c', [47] = 'v', [48] = 'b',
+		[49] = 'n', [50] = 'm', [51] = ',', [52] = '.', [53] = '/',
+		[57] = ' ',
+	};
+
+	return qwerty_map[code];
+}
+
+/*
+ * Returns the keycode for a QWERTY character, independent of current layout.
+ * This is the reverse of way_input_code_to_qwerty.
+ */
+uint8_t way_input_qwerty_to_code(char c)
+{
+	/* Map from QWERTY character to evdev keycode */
+	static const uint8_t reverse_qwerty_map[128] = {
+		['1'] = 2,  ['2'] = 3,  ['3'] = 4,  ['4'] = 5,  ['5'] = 6,
+		['6'] = 7,  ['7'] = 8,  ['8'] = 9,  ['9'] = 10, ['0'] = 11,
+		['-'] = 12, ['='] = 13,
+		['q'] = 16, ['w'] = 17, ['e'] = 18, ['r'] = 19, ['t'] = 20,
+		['y'] = 21, ['u'] = 22, ['i'] = 23, ['o'] = 24, ['p'] = 25,
+		['['] = 26, [']'] = 27,
+		['a'] = 30, ['s'] = 31, ['d'] = 32, ['f'] = 33, ['g'] = 34,
+		['h'] = 35, ['j'] = 36, ['k'] = 37, ['l'] = 38, [';'] = 39,
+		['\''] = 40, ['`'] = 41, ['\\'] = 43,
+		['z'] = 44, ['x'] = 45, ['c'] = 46, ['v'] = 47, ['b'] = 48,
+		['n'] = 49, ['m'] = 50, [','] = 51, ['.'] = 52, ['/'] = 53,
+		[' '] = 57,
+	};
+
+	if (c < 0 || c > 127)
+		return 0;
+
+	return reverse_qwerty_map[(int)c];
+}
+
+/*
+ * Returns the keycode for special keys, independent of current layout.
+ * These are evdev keycodes which are hardware-based.
+ */
+uint8_t way_input_special_to_code(const char *name)
+{
+	/* evdev keycodes for special keys */
+	if (!strcmp(name, "esc")) return 1;
+	if (!strcmp(name, "backspace")) return 14;
+	if (!strcmp(name, "space")) return 57;
+	if (!strcmp(name, "enter") || !strcmp(name, "return")) return 28;
+	if (!strcmp(name, "tab")) return 15;
+	if (!strcmp(name, "delete")) return 111;
+	if (!strcmp(name, "leftarrow") || !strcmp(name, "left")) return 105;
+	if (!strcmp(name, "rightarrow") || !strcmp(name, "right")) return 106;
+	if (!strcmp(name, "uparrow") || !strcmp(name, "up")) return 103;
+	if (!strcmp(name, "downarrow") || !strcmp(name, "down")) return 108;
+
+	return 0;
 }
 
 void way_mouse_move(struct screen *scr, int x, int y)
@@ -220,6 +295,9 @@ void wayland_init(struct platform *platform)
 	platform->input_grab_keyboard = way_input_grab_keyboard;
 	platform->input_lookup_code = way_input_lookup_code;
 	platform->input_lookup_name = way_input_lookup_name;
+	platform->input_code_to_qwerty = way_input_code_to_qwerty;
+	platform->input_qwerty_to_code = way_input_qwerty_to_code;
+	platform->input_special_to_code = way_input_special_to_code;
 	platform->input_next_event = way_input_next_event;
 	platform->input_ungrab_keyboard = way_input_ungrab_keyboard;
 	platform->input_wait = way_input_wait;

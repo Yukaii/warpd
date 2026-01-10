@@ -216,6 +216,9 @@ void x_init(struct platform *platform)
 	platform->input_grab_keyboard = x_input_grab_keyboard;
 	platform->input_lookup_code = x_input_lookup_code;
 	platform->input_lookup_name = x_input_lookup_name;
+	platform->input_code_to_qwerty = x_input_code_to_qwerty;
+	platform->input_qwerty_to_code = x_input_qwerty_to_code;
+	platform->input_special_to_code = x_input_special_to_code;
 	platform->input_next_event = x_input_next_event;
 	platform->input_ungrab_keyboard = x_input_ungrab_keyboard;
 	platform->input_wait = x_input_wait;

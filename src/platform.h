@@ -52,6 +52,15 @@ struct platform {
 	uint8_t (*input_lookup_code)(const char *name, int *shifted);
 	const char *(*input_lookup_name)(uint8_t code, int shifted);
 
+	/* Returns the QWERTY character for a keycode, independent of current layout */
+	char (*input_code_to_qwerty)(uint8_t code);
+
+	/* Returns the keycode for a QWERTY character, independent of current layout */
+	uint8_t (*input_qwerty_to_code)(char c);
+
+	/* Returns the keycode for special keys (esc, backspace, space, etc.), independent of layout */
+	uint8_t (*input_special_to_code)(const char *name);
+
 	/*
 	 * Efficiently listen for one or more input events before
 	 * grabbing the keyboard (including the event itself)

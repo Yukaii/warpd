@@ -297,6 +297,99 @@ static const char *input_lookup_name(uint8_t code, int shifted)
 		return keymap[code];
 }
 
+/*
+ * Returns the QWERTY character for a keycode, independent of current layout.
+ * This is used by hint mode to match keypresses regardless of keyboard layout.
+ * Windows uses virtual key codes where letters A-Z are 0x41-0x5A.
+ */
+static char input_code_to_qwerty(uint8_t code)
+{
+	/* Letters: A-Z are VK codes 0x41-0x5A */
+	if (code >= 'A' && code <= 'Z')
+		return code - 'A' + 'a';
+
+	/* Numbers: 0-9 are VK codes 0x30-0x39 */
+	if (code >= '0' && code <= '9')
+		return code;
+
+	/* Space: VK_SPACE is 0x20 */
+	if (code == 0x20)
+		return ' ';
+
+	/* OEM keys (QWERTY specific positions) */
+	switch (code) {
+		case 0xBA: return ';';   /* VK_OEM_1 */
+		case 0xBB: return '=';   /* VK_OEM_PLUS */
+		case 0xBC: return ',';   /* VK_OEM_COMMA */
+		case 0xBD: return '-';   /* VK_OEM_MINUS */
+		case 0xBE: return '.';   /* VK_OEM_PERIOD */
+		case 0xBF: return '/';   /* VK_OEM_2 */
+		case 0xC0: return '`';   /* VK_OEM_3 */
+		case 0xDB: return '[';   /* VK_OEM_4 */
+		case 0xDC: return '\\';  /* VK_OEM_5 */
+		case 0xDD: return ']';   /* VK_OEM_6 */
+		case 0xDE: return '\'';  /* VK_OEM_7 */
+	}
+
+	return 0;
+}
+
+/*
+ * Returns the keycode for a QWERTY character, independent of current layout.
+ * This is the reverse of input_code_to_qwerty.
+ */
+static uint8_t input_qwerty_to_code(char c)
+{
+	/* Letters: a-z map to VK codes 0x41-0x5A (uppercase) */
+	if (c >= 'a' && c <= 'z')
+		return c - 'a' + 'A';
+
+	/* Numbers: 0-9 are VK codes 0x30-0x39 */
+	if (c >= '0' && c <= '9')
+		return c;
+
+	/* Space: VK_SPACE is 0x20 */
+	if (c == ' ')
+		return 0x20;
+
+	/* OEM keys (QWERTY specific positions) */
+	switch (c) {
+		case ';':  return 0xBA;  /* VK_OEM_1 */
+		case '=':  return 0xBB;  /* VK_OEM_PLUS */
+		case ',':  return 0xBC;  /* VK_OEM_COMMA */
+		case '-':  return 0xBD;  /* VK_OEM_MINUS */
+		case '.':  return 0xBE;  /* VK_OEM_PERIOD */
+		case '/':  return 0xBF;  /* VK_OEM_2 */
+		case '`':  return 0xC0;  /* VK_OEM_3 */
+		case '[':  return 0xDB;  /* VK_OEM_4 */
+		case '\\': return 0xDC;  /* VK_OEM_5 */
+		case ']':  return 0xDD;  /* VK_OEM_6 */
+		case '\'': return 0xDE;  /* VK_OEM_7 */
+	}
+
+	return 0;
+}
+
+/*
+ * Returns the keycode for special keys, independent of current layout.
+ */
+static uint8_t input_special_to_code(const char *name)
+{
+	/* Windows virtual key codes for special keys */
+	if (!strcmp(name, "esc")) return 0x1B;        /* VK_ESCAPE */
+	if (!strcmp(name, "backspace")) return 0x08;  /* VK_BACK */
+	if (!strcmp(name, "space")) return 0x20;      /* VK_SPACE */
+	if (!strcmp(name, "enter") || !strcmp(name, "return")) return 0x0D;  /* VK_RETURN */
+	if (!strcmp(name, "tab")) return 0x09;        /* VK_TAB */
+	if (!strcmp(name, "delete")) return 0x2E;     /* VK_DELETE */
+	if (!strcmp(name, "leftarrow") || !strcmp(name, "left")) return 0x25;   /* VK_LEFT */
+	if (!strcmp(name, "rightarrow") || !strcmp(name, "right")) return 0x27; /* VK_RIGHT */
+	if (!strcmp(name, "uparrow") || !strcmp(name, "up")) return 0x26;       /* VK_UP */
+	if (!strcmp(name, "downarrow") || !strcmp(name, "down")) return 0x28;   /* VK_DOWN */
+
+	return 0;
+}
+
 static void send_key(uint8_t code, int pressed)
 {
 	INPUT input;
@@ -471,6 +564,9 @@ void platform_run(int (*main)(struct platform *platform))
 	platform.input_grab_keyboard = input_grab_keyboard;
 	platform.input_lookup_code = input_lookup_code;
 	platform.input_lookup_name = input_lookup_name;
+	platform.input_code_to_qwerty = input_code_to_qwerty;
+	platform.input_qwerty_to_code = input_qwerty_to_code;
+	platform.input_special_to_code = input_special_to_code;
 	platform.monitor_file = wn_monitor_file;
 
 	exit(main(&platform));

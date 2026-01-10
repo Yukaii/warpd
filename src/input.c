@@ -20,6 +20,7 @@ int input_parse_string(struct input_event *ev, const char *s)
 
 	ev->mods = 0;
 	ev->pressed = 1;
+	ev->code = 0;
 
 	while (s[1] == '-') {
 		switch (s[0]) {
@@ -44,9 +45,30 @@ int input_parse_string(struct input_event *ev, const char *s)
 	}
 
 	if (s[0]) {
-		int shifted;
+		int shifted = 0;
 
-		ev->code = platform->input_lookup_code(s, &shifted);
+		/*
+		 * For single printable characters, use layout-independent QWERTY
+		 * mapping. This ensures key bindings work regardless of the current
+		 * keyboard layout (e.g., Hebrew, Russian, Arabic).
+		 */
+		if (s[1] == 0 && s[0] >= ' ' && s[0] <= '~') {
+			ev->code = platform->input_qwerty_to_code(s[0]);
+			/* Handle uppercase letters - map to lowercase and set shift */
+			if (!ev->code && s[0] >= 'A' && s[0] <= 'Z') {
+				ev->code = platform->input_qwerty_to_code(s[0] - 'A' + 'a');
+				shifted = 1;
+			}
+		}
+
+		/* Try layout-independent lookup for special keys (esc, backspace, etc.) */
+		if (!ev->code)
+			ev->code = platform->input_special_to_code(s);
+
+		/* Fall back to layout-dependent lookup as last resort */
+		if (!ev->code)
+			ev->code = platform->input_lookup_code(s, &shifted);
+
 		if (shifted)
 			ev->mods |= PLATFORM_MOD_SHIFT;
 

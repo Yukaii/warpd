@@ -465,3 +465,79 @@ const char *x_input_lookup_name(uint8_t code, int shifted)
 
 	return name;
 }
+
+/*
+ * Returns the QWERTY character for a keycode, independent of current layout.
+ * This is used by hint mode to match keypresses regardless of keyboard layout.
+ * X11 keycodes are evdev keycodes + 8.
+ */
+char x_input_code_to_qwerty(uint8_t code)
+{
+	/* Map from X11 keycode (evdev + 8) to QWERTY character */
+	static const char qwerty_map[256] = {
+		[10] = '1', [11] = '2', [12] = '3', [13] = '4', [14] = '5',
+		[15] = '6', [16] = '7', [17] = '8', [18] = '9', [19] = '0',
+		[20] = '-', [21] = '=',
+		[24] = 'q', [25] = 'w', [26] = 'e', [27] = 'r', [28] = 't',
+		[29] = 'y', [30] = 'u', [31] = 'i', [32] = 'o', [33] = 'p',
+		[34] = '[', [35] = ']',
+		[38] = 'a', [39] = 's', [40] = 'd', [41] = 'f', [42] = 'g',
+		[43] = 'h', [44] = 'j', [45] = 'k', [46] = 'l', [47] = ';',
+		[48] = '\'', [49] = '`', [51] = '\\',
+		[52] = 'z', [53] = 'x', [54] = 'c', [55] = 'v', [56] = 'b',
+		[57] = 'n', [58] = 'm', [59] = ',', [60] = '.', [61] = '/',
+		[65] = ' ',
+	};
+
+	return qwerty_map[code];
+}
+
+/*
+ * Returns the keycode for a QWERTY character, independent of current layout.
+ * This is the reverse of x_input_code_to_qwerty.
+ * X11 keycodes are evdev keycodes + 8.
+ */
+uint8_t x_input_qwerty_to_code(char c)
+{
+	/* Map from QWERTY character to X11 keycode (evdev + 8) */
+	static const uint8_t reverse_qwerty_map[128] = {
+		['1'] = 10, ['2'] = 11, ['3'] = 12, ['4'] = 13, ['5'] = 14,
+		['6'] = 15, ['7'] = 16, ['8'] = 17, ['9'] = 18, ['0'] = 19,
+		['-'] = 20, ['='] = 21,
+		['q'] = 24, ['w'] = 25, ['e'] = 26, ['r'] = 27, ['t'] = 28,
+		['y'] = 29, ['u'] = 30, ['i'] = 31, ['o'] = 32, ['p'] = 33,
+		['['] = 34, [']'] = 35,
+		['a'] = 38, ['s'] = 39, ['d'] = 40, ['f'] = 41, ['g'] = 42,
+		['h'] = 43, ['j'] = 44, ['k'] = 45, ['l'] = 46, [';'] = 47,
+		['\''] = 48, ['`'] = 49, ['\\'] = 51,
+		['z'] = 52, ['x'] = 53, ['c'] = 54, ['v'] = 55, ['b'] = 56,
+		['n'] = 57, ['m'] = 58, [','] = 59, ['.'] = 60, ['/'] = 61,
+		[' '] = 65,
+	};
+
+	if (c < 0 || c > 127)
+		return 0;
+
+	return reverse_qwerty_map[(int)c];
+}
+
+/*
+ * Returns the keycode for special keys, independent of current layout.
+ * X11 keycodes are evdev keycodes + 8.
+ */
+uint8_t x_input_special_to_code(const char *name)
+{
+	/* X11 keycodes (evdev + 8) for special keys */
+	if (!strcmp(name, "esc")) return 9;
+	if (!strcmp(name, "backspace")) return 22;
+	if (!strcmp(name, "space")) return 65;
+	if (!strcmp(name, "enter") || !strcmp(name, "return")) return 36;
+	if (!strcmp(name, "tab")) return 23;
+	if (!strcmp(name, "delete")) return 119;
+	if (!strcmp(name, "leftarrow") || !strcmp(name, "left")) return 113;
+	if (!strcmp(name, "rightarrow") || !strcmp(name, "right")) return 114;
+	if (!strcmp(name, "uparrow") || !strcmp(name, "up")) return 111;
+	if (!strcmp(name, "downarrow") || !strcmp(name, "down")) return 116;
+
+	return 0;
+}

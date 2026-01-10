@@ -136,12 +136,17 @@ static int hint_selection(screen_t scr, struct hint *_hints, size_t _nr_hints)
 			if (len)
 				buf[len - 1] = 0;
 		} else {
-			const char *name = input_event_tostr(ev);
+			/*
+			 * Use keycode-to-QWERTY mapping instead of layout-dependent
+			 * character names. This allows hint mode to work regardless
+			 * of the current keyboard layout (e.g., Hebrew, Russian).
+			 */
+			char c = platform->input_code_to_qwerty(ev->code);
 
-			if (!name || name[1])
+			if (!c)
 				continue;
 
-			buf[len++] = name[0];
+			buf[len++] = c;
 		}
 
 		filter(scr, buf);

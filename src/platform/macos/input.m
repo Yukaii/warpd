@@ -224,6 +224,78 @@ const char *osx_input_lookup_name(uint8_t code, int shifted)
 	return name;
 }
 
+/*
+ * Returns the QWERTY character for a keycode, independent of current layout.
+ * This is used by hint mode to match keypresses regardless of keyboard layout.
+ * macOS keycodes are hardware-based and don't change with layout.
+ * Note: warpd uses 1-indexed keycodes (Apple keycode + 1).
+ */
+char osx_input_code_to_qwerty(uint8_t code)
+{
+	/* Map from warpd keycode (Apple keycode + 1) to QWERTY character */
+	static const char qwerty_map[256] = {
+		[1]  = 'a', [2]  = 's', [3]  = 'd', [4]  = 'f', [5]  = 'h',
+		[6]  = 'g', [7]  = 'z', [8]  = 'x', [9]  = 'c', [10] = 'v',
+		[12] = 'b', [13] = 'q', [14] = 'w', [15] = 'e', [16] = 'r',
+		[17] = 'y', [18] = 't', [19] = '1', [20] = '2', [21] = '3',
+		[22] = '4', [23] = '6', [24] = '5', [25] = '=', [26] = '9',
+		[27] = '7', [28] = '-', [29] = '8', [30] = '0', [31] = ']',
+		[32] = 'o', [33] = 'u', [34] = '[', [35] = 'i', [36] = 'p',
+		[38] = 'l', [39] = 'j', [40] = '\'', [41] = 'k', [42] = ';',
+		[43] = '\\', [44] = ',', [45] = '/', [46] = 'n', [47] = 'm',
+		[48] = '.', [50] = ' ', [51] = '`',
+	};
+
+	return qwerty_map[code];
+}
+
+/*
+ * Returns the keycode for a QWERTY character, independent of current layout.
+ * This is the reverse of osx_input_code_to_qwerty.
+ */
+uint8_t osx_input_qwerty_to_code(char c)
+{
+	/* Map from QWERTY character to warpd keycode (Apple keycode + 1) */
+	static const uint8_t reverse_qwerty_map[128] = {
+		['a'] = 1,  ['s'] = 2,  ['d'] = 3,  ['f'] = 4,  ['h'] = 5,
+		['g'] = 6,  ['z'] = 7,  ['x'] = 8,  ['c'] = 9,  ['v'] = 10,
+		['b'] = 12, ['q'] = 13, ['w'] = 14, ['e'] = 15, ['r'] = 16,
+		['y'] = 17, ['t'] = 18, ['1'] = 19, ['2'] = 20, ['3'] = 21,
+		['4'] = 22, ['6'] = 23, ['5'] = 24, ['='] = 25, ['9'] = 26,
+		['7'] = 27, ['-'] = 28, ['8'] = 29, ['0'] = 30, [']'] = 31,
+		['o'] = 32, ['u'] = 33, ['['] = 34, ['i'] = 35, ['p'] = 36,
+		['l'] = 38, ['j'] = 39, ['\''] = 40, ['k'] = 41, [';'] = 42,
+		['\\'] = 43, [','] = 44, ['/'] = 45, ['n'] = 46, ['m'] = 47,
+		['.'] = 48, [' '] = 50, ['`'] = 51,
+	};
+
+	if (c < 0 || c > 127)
+		return 0;
+
+	return reverse_qwerty_map[(int)c];
+}
+
+/*
+ * Returns the keycode for special keys, independent of current layout.
+ * These keycodes are hardware-based and don't change with keyboard layout.
+ */
+uint8_t osx_input_special_to_code(const char *name)
+{
+	/* macOS keycodes (Apple keycode + 1) for special keys */
+	if (!strcmp(name, "esc")) return 54;
+	if (!strcmp(name, "backspace")) return 52;
+	if (!strcmp(name, "space")) return 50;
+	if (!strcmp(name, "enter") || !strcmp(name, "return")) return 37;
+	if (!strcmp(name, "tab")) return 49;
+	if (!strcmp(name, "delete")) return 118;
+	if (!strcmp(name, "leftarrow")) return 124;
+	if (!strcmp(name, "rightarrow")) return 125;
+	if (!strcmp(name, "uparrow")) return 127;
+	if (!strcmp(name, "downarrow")) return 126;
+
+	return 0;
+}
+
 uint8_t osx_input_lookup_code(const char *name, int *shifted)
 {
 	size_t i;
