@@ -1,3 +1,11 @@
+# warpd (Non-Latin Layout Fork)
+
+> **This is a fork of [warpd](https://github.com/rvaiya/warpd) by Raheman Vaiya.**
+>
+> This fork fixes issues with non-Latin keyboard layouts (Hebrew, Russian, Arabic, etc.) on macOS where the original version would become unresponsive. See [FORK_CHANGES.md](FORK_CHANGES.md) for details.
+
+---
+
 # What
 
 A modal keyboard driven interface for mouse manipulation.
