@@ -290,6 +290,17 @@ left: a
 down: s
 up: w
 right: d
+
+# Hint font (monospace recommended for distinguishing I/l/1)
+# macOS PostScript names: Menlo-Regular (default), Monaco, Courier
+# Linux xft names: Monospace, DejaVu Sans Mono, Liberation Mono
+hint_font: Menlo-Regular
+
+# Hint appearance
+hint_bgcolor: #1c1c1e
+hint_fgcolor: #a1aba7
+hint_size: 20
+hint_border_radius: 3
 ```
 
 ## Wayland

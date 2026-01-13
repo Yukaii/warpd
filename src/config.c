@@ -98,7 +98,7 @@ static struct {
 	{ "hint_bgcolor", "#1c1c1e", "The background hint color.", OPT_STRING },
 	{ "hint_fgcolor", "#a1aba7", "The foreground hint color.", OPT_STRING },
 	{ "hint_chars", "abcdefghijklmnopqrstuvwxyz", "The character set from which hints are generated. The total number of hints is the square of the size of this string. It may be desirable to increase this for larger screens or trim it to increase gaps between hints.", OPT_STRING },
-	{ "hint_font", "Arial", "The font name used by hints. Note: This is platform specific, in X it corresponds to a valid xft font name, on macos it corresponds to a postscript name.", OPT_STRING },
+	{ "hint_font", "Menlo-Regular", "The font name used by hints. Note: This is platform specific, in X it corresponds to a valid xft font name, on macos it corresponds to a postscript name.", OPT_STRING },
 
 	{ "hint_size", "20", "Hint size (range: 1-1000)", OPT_INT },
 	{ "hint_border_radius", "3", "Border radius.", OPT_INT },
