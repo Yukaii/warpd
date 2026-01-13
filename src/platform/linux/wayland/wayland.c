@@ -251,6 +251,20 @@ void way_scroll(int direction)
 	wl_display_flush(wl.dpy);
 }
 
+void way_scroll_amount(int direction, int amount)
+{
+	//TODO: add horizontal scroll
+	direction = direction == SCROLL_DOWN ? 1 : -1;
+
+	zwlr_virtual_pointer_v1_axis_discrete(wl.ptr, 0, 0,
+					      wl_fixed_from_int(15*direction*amount),
+					      direction*amount);
+
+	zwlr_virtual_pointer_v1_frame(wl.ptr);
+
+	wl_display_flush(wl.dpy);
+}
+
 void way_copy_selection() { UNIMPLEMENTED }
 struct input_event *way_input_wait(struct input_event *events, size_t sz) { UNIMPLEMENTED }
 
@@ -313,4 +327,5 @@ void wayland_init(struct platform *platform)
 	platform->screen_get_dimensions = way_screen_get_dimensions;
 	platform->screen_list = way_screen_list;
 	platform->scroll = way_scroll;
+	platform->scroll_amount = way_scroll_amount;
 }

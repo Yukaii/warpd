@@ -95,6 +95,7 @@ struct platform {
 	void (*hint_draw)(struct screen *scr, struct hint *hints, size_t n);
 
 	void (*scroll)(int direction);
+	void (*scroll_amount)(int direction, int amount);
 
 	void (*copy_selection)();
 

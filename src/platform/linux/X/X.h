@@ -104,6 +104,7 @@ void x_screen_list(screen_t scr[MAX_SCREENS], size_t *n);
 void x_init_hint(const char *bg, const char *fg, int border_radius, const char *font_family);
 void x_hint_draw(struct screen *scr, struct hint *hints, size_t n);
 void x_scroll(int direction);
+void x_scroll_amount(int direction, int amount);
 void x_copy_selection();
 void x_commit();
 void x_monitor_file(const char *path);

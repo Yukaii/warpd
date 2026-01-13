@@ -244,6 +244,31 @@ void osx_scroll(int direction)
 	CGEventPost(kCGHIDEventTap, ev);
 }
 
+void osx_scroll_amount(int direction, int amount)
+{
+	int y = 0;
+	int x = 0;
+
+	switch (direction) {
+	case SCROLL_UP:
+		y = amount;
+		break;
+	case SCROLL_DOWN:
+		y = -amount;
+		break;
+	case SCROLL_RIGHT:
+		x = -amount;
+		break;
+	case SCROLL_LEFT:
+		x = amount;
+		break;
+	}
+
+	CGEventRef ev = CGEventCreateScrollWheelEvent(
+	    NULL, kCGScrollEventUnitPixel, 2, y, x);
+	CGEventPost(kCGHIDEventTap, ev);
+}
+
 void osx_commit()
 {
 	dispatch_sync(dispatch_get_main_queue(), ^{
@@ -288,6 +313,7 @@ static void *mainloop(void *arg)
 		.screen_get_dimensions = osx_screen_get_dimensions,
 		.screen_list = osx_screen_list,
 		.scroll = osx_scroll,
+		.scroll_amount = osx_scroll_amount,
 		.monitor_file = osx_monitor_file,
 	};
 

@@ -56,6 +56,10 @@ static struct {
 	{ "scroll_up", "r", "Scroll up key.", OPT_KEY },
 	{ "scroll_left", "t", "Scroll left key.", OPT_KEY },
 	{ "scroll_right", "y", "Scroll right key.", OPT_KEY },
+	{ "scroll_page_down", "f", "Scroll down one page.", OPT_KEY },
+	{ "scroll_page_up", "b", "Scroll up one page.", OPT_KEY },
+	{ "scroll_home", "z", "Scroll to top of page.", OPT_KEY },
+	{ "scroll_end", "Z", "Scroll to bottom of page.", OPT_KEY },
 
 	{ "cursor_color", "#FF4500", "The color of the pointer in normal mode (rgba hex value).", OPT_STRING },
 
@@ -114,6 +118,8 @@ static struct {
 	{ "scroll_max_speed", "9000", "Maximum scroll speed.", OPT_INT },
 	{ "scroll_acceleration", "1600", "Scroll acceleration in units/second^2.", OPT_INT },
 	{ "scroll_deceleration", "-3400", "Scroll deceleration.", OPT_INT },
+	{ "scroll_page_amount", "800", "Number of scroll units for page up/down.", OPT_INT },
+	{ "scroll_home_amount", "100000", "Number of scroll units for home/end (scroll to top/bottom).", OPT_INT },
 
 	{ "indicator", "none", "Specifies an optional visual indicator to be displayed while normal mode is active, must be one of: topright, topleft, bottomright, bottomleft, none", OPT_STRING },
 	{ "indicator_color", "#00ff00", "The color of the visual indicator color.", OPT_STRING },

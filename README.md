@@ -159,6 +159,139 @@ mode to be activated for selection of the drag target.
 
 A more comprehensive description can be found in the [man page](warpd.1.md) (along with a list of options).
 
+# Default Keymappings
+
+## Mode Activation (Global)
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `Alt-Cmd-x` | Hint Mode | Generate hints for clickable elements |
+| `Alt-Cmd-X` | Hint Mode (2-pass) | Two-step hint selection for more targets |
+| `Alt-Cmd-l` | Hint Mode (oneshot) | Hint mode that exits after selection |
+| `Alt-Cmd-L` | Hint Mode 2 (oneshot) | Two-pass hint mode that exits after selection |
+| `Alt-Cmd-g` | Grid Mode | Activate grid-based cursor positioning |
+| `Alt-Cmd-c` | Normal Mode | Manual cursor movement with keyboard |
+| `Alt-Cmd-h` | History Mode | Navigate to previously clicked locations |
+| `Alt-Cmd-s` | Screen Selection | Select which screen to operate on |
+
+## Normal Mode
+
+### Cursor Movement
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `h` | Move Left | Move cursor left |
+| `j` | Move Down | Move cursor down |
+| `k` | Move Up | Move cursor up |
+| `l` | Move Right | Move cursor right |
+| `H` | Jump to Top | Move cursor to top of screen |
+| `M` | Jump to Middle | Move cursor to middle of screen |
+| `L` | Jump to Bottom | Move cursor to bottom of screen |
+| `0` | Jump to Start | Move cursor to leftmost edge |
+| `$` | Jump to End | Move cursor to rightmost edge |
+
+### Speed Modifiers
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `a` | Accelerator | Increase cursor speed while held (2900 px/s²) |
+| `d` | Decelerator | Slow cursor for precision (50 px/s) |
+
+### Scrolling (Smooth)
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `e` | Scroll Down | Smooth scroll down (with acceleration) |
+| `r` | Scroll Up | Smooth scroll up (with acceleration) |
+| `t` | Scroll Left | Smooth scroll left (with acceleration) |
+| `y` | Scroll Right | Smooth scroll right (with acceleration) |
+
+### Scrolling (Instant)
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `f` | Page Down | Instant scroll down one page (800 units) |
+| `b` | Page Up | Instant scroll up one page (800 units) |
+| `z` | Home/Top | Instant scroll to top (100000 units) |
+| `Z` | End/Bottom | Instant scroll to bottom (100000 units) |
+
+### Mouse Actions
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `m` | Left Click | Standard left mouse button click |
+| `,` | Middle Click | Middle mouse button click |
+| `.` | Right Click | Right mouse button click (context menu) |
+| `n` | Left Click (oneshot) | Click and exit normal mode |
+| `-` | Middle Click (oneshot) | Middle click and exit normal mode |
+| `/` | Right Click (oneshot) | Right click and exit normal mode |
+| `v` | Toggle Drag Mode | Enter/exit visual (drag) mode |
+| `c` | Copy & Exit | Send copy command and exit |
+
+### Mode Switching (From Normal Mode)
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `x` | Hint Mode | Switch to hint mode |
+| `X` | Hint Mode (2-pass) | Switch to two-pass hint mode |
+| `g` | Grid Mode | Switch to grid mode |
+| `s` | Screen Selection | Select different screen |
+| `;` | History Mode | Show hint history |
+
+### Other
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `p` | Print Coordinates | Output cursor position to stdout |
+| `Esc` | Exit | Exit warpd and return to normal usage |
+
+## Grid Mode
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `u` | Top-Left | Select top-left quadrant |
+| `i` | Top-Right | Select top-right quadrant |
+| `j` | Bottom-Left | Select bottom-left quadrant |
+| `k` | Bottom-Right | Select bottom-right quadrant |
+| `w` | Move Up | Move grid up |
+| `a` | Move Left | Move grid left |
+| `s` | Move Down | Move grid down |
+| `d` | Move Right | Move grid right |
+| `W` | Cut Up | Cut grid to upper half |
+| `A` | Cut Left | Cut grid to left half |
+| `S` | Cut Down | Cut grid to lower half |
+| `D` | Cut Right | Cut grid to right half |
+| `c` | Exit to Normal | Exit grid mode, return to normal mode |
+| `Esc` | Exit | Exit warpd completely |
+
+## History Mode
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| `Ctrl-o` | History Back | Navigate to previous position |
+| `Ctrl-i` | History Forward | Navigate to next position |
+
+## Configuration
+
+All keybindings can be customized in `~/.config/warpd/config`. See the [man page](warpd.1.md) for complete configuration options.
+
+Example config snippet:
+```
+# Customize scroll keys
+scroll_left: q
+scroll_right: w
+
+# Adjust scroll amounts
+scroll_page_amount: 1000
+scroll_home_amount: 8000
+
+# Change cursor movement keys
+left: a
+down: s
+up: w
+right: d
+```
+
 ## Wayland
 
 *Note:* Wayland does not permit clients to globally bind hotkeys. These must be

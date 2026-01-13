@@ -87,7 +87,11 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		"right",
 		"screen",
 		"scroll_down",
+		"scroll_end",
+		"scroll_home",
 		"scroll_left",
+		"scroll_page_down",
+		"scroll_page_up",
 		"scroll_right",
 		"scroll_up",
 		"start",
@@ -172,6 +176,34 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				scroll_accelerate(SCROLL_RIGHT);
 			} else
 				scroll_decelerate();
+		} else if (config_input_match(ev, "scroll_page_down")) {
+			if (ev->pressed) {
+				int amount = config_get_int("scroll_page_amount");
+				scroll_stop();
+				redraw(scr, mx, my, 1);
+				platform->scroll_amount(SCROLL_DOWN, amount);
+			}
+		} else if (config_input_match(ev, "scroll_page_up")) {
+			if (ev->pressed) {
+				int amount = config_get_int("scroll_page_amount");
+				scroll_stop();
+				redraw(scr, mx, my, 1);
+				platform->scroll_amount(SCROLL_UP, amount);
+			}
+		} else if (config_input_match(ev, "scroll_home")) {
+			if (ev->pressed) {
+				int amount = config_get_int("scroll_home_amount");
+				scroll_stop();
+				redraw(scr, mx, my, 1);
+				platform->scroll_amount(SCROLL_UP, amount);
+			}
+		} else if (config_input_match(ev, "scroll_end")) {
+			if (ev->pressed) {
+				int amount = config_get_int("scroll_home_amount");
+				scroll_stop();
+				redraw(scr, mx, my, 1);
+				platform->scroll_amount(SCROLL_DOWN, amount);
+			}
 		} else if (config_input_match(ev, "accelerator")) {
 			if (ev->pressed)
 				mouse_fast();

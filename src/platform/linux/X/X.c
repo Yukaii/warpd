@@ -133,6 +133,32 @@ void x_scroll(int direction)
 	XTestFakeButtonEvent(dpy, btn, False, CurrentTime);
 }
 
+void x_scroll_amount(int direction, int amount)
+{
+	int i;
+	int btn = 0;
+
+	switch (direction) {
+	case SCROLL_UP:
+		btn = 4;
+		break;
+	case SCROLL_DOWN:
+		btn = 5;
+		break;
+	case SCROLL_RIGHT:
+		btn = 7;
+		break;
+	case SCROLL_LEFT:
+		btn = 6;
+		break;
+	}
+
+	for (i = 0; i < amount; i++) {
+		XTestFakeButtonEvent(dpy, btn, True, CurrentTime);
+		XTestFakeButtonEvent(dpy, btn, False, CurrentTime);
+	}
+}
+
 Window create_window(const char *color)
 {
 	uint32_t col = 0;
@@ -234,4 +260,5 @@ void x_init(struct platform *platform)
 	platform->screen_get_dimensions = x_screen_get_dimensions;
 	platform->screen_list = x_screen_list;
 	platform->scroll = x_scroll;
+	platform->scroll_amount = x_scroll_amount;
 }

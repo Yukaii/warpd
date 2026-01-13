@@ -125,6 +125,7 @@ void way_screen_list(screen_t scr[MAX_SCREENS], size_t *n);
 void way_init_hint(const char *bg, const char *fg, int border_radius, const char *font_family);
 void way_hint_draw(struct screen *scr, struct hint *hints, size_t n);
 void way_scroll(int direction);
+void way_scroll_amount(int direction, int amount);
 void way_copy_selection();
 void way_commit();
 void way_init();
