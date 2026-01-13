@@ -1,8 +1,10 @@
 # Fork Changes
 
-This is a fork of [warpd](https://github.com/rvaiya/warpd) by Raheman Vaiya.
+This is a fork of [warpd](https://github.com/rvaiya/warpd) by Raheman Vaiya, based on [B1T3X's fork](https://gitlab.com/B1T3X/warpd).
 
-All credit for the original warpd implementation goes to the original author. This fork adds fixes for non-Latin keyboard layout support on macOS.
+All credit for the original warpd implementation goes to the original author. This fork includes:
+- Fixes for non-Latin keyboard layout support on macOS (from B1T3X's fork)
+- Additional enhancements: visual ripple effects, horizontal scrolling, page scrolling
 
 ## Problem
 

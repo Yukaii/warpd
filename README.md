@@ -2,7 +2,9 @@
 
 > **This is a fork of [warpd](https://github.com/rvaiya/warpd) by Raheman Vaiya.**
 >
-> This fork fixes issues with non-Latin keyboard layouts (Hebrew, Russian, Arabic, etc.) on macOS where the original version would become unresponsive. See [FORK_CHANGES.md](FORK_CHANGES.md) for details.
+> This fork is based on [B1T3X's fork](https://gitlab.com/B1T3X/warpd) with additional improvements.
+>
+> This fork fixes issues with non-Latin keyboard layouts (Hebrew, Russian, Arabic, etc.) on macOS where the original version would become unresponsive. It also adds visual ripple effects, horizontal scrolling, and other enhancements. See [FORK_CHANGES.md](FORK_CHANGES.md) for details.
 
 ---
 
