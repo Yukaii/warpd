@@ -71,6 +71,8 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 			platform->mouse_get_position(&scr, NULL, NULL);
 			platform->mouse_get_position(NULL, &x, &y);
 
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, x, y);
+
 			if (record_history)
 				histfile_add(x, y);
 

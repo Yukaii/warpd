@@ -205,7 +205,7 @@ struct ripple {
 1. Trigger: `platform->trigger_ripple(scr, x, y)` creates new ripple
 2. Update: Each redraw updates `radius` based on elapsed time
 3. Render: Draw expanding circle with alpha fade-out
-4. Continuous redraw: `normal.c` checks `platform->has_active_ripples()` and forces redraw when animations are active
+4. Continuous redraw: Each mode checks `platform->has_active_ripples()` and forces redraw when animations are active
 
 Time-based animation ensures frame-rate independence:
 ```c
@@ -213,6 +213,47 @@ float progress = (float)elapsed_ms / (float)duration_ms;
 radius = progress * max_radius;
 alpha = 1.0 - progress;  // Fade out
 ```
+
+**Where Ripples Are Triggered**:
+- **Normal Mode** (`src/normal.c`):
+  - Clicks: `m`, `,`, `.` (buttons)
+  - Jumps: `H`, `M`, `L` (top/middle/bottom), `0`, `$` (start/end)
+  - History navigation: `Ctrl-o`, `Ctrl-i`
+  - Oneshot buttons: `n`, `-`, `/`
+
+- **Grid Mode** (`src/grid.c`):
+  - Quadrant selection: `u`, `i`, `j`, `k`
+  - Grid cuts: `W`, `A`, `S`, `D`
+  - Button clicks within grid mode
+
+- **Hint Mode** (`src/hint.c`):
+  - Final hint selection (when hint is chosen)
+
+- **History Mode**:
+  - Uses hint selection (ripple from hint.c)
+
+- **Mode Loop** (`src/mode-loop.c`):
+  - Oneshot mode clicks
+
+**Configuration**:
+```
+ripple_enabled: 1               # Enable/disable ripples
+ripple_color: #00ff0060         # RGBA hex (last 2 digits = alpha)
+ripple_duration: 300            # Animation duration (ms)
+ripple_max_radius: 50           # Maximum radius (pixels)
+ripple_line_width: 2            # Circle line width
+```
+
+Color format: `#RRGGBBAA` where:
+- `RR` = Red (00-FF)
+- `GG` = Green (00-FF)
+- `BB` = Blue (00-FF)
+- `AA` = Alpha/transparency (00=transparent, FF=opaque)
+
+Examples:
+- `#ff000080` - Semi-transparent red
+- `#00ff00ff` - Opaque green
+- `#0080ff40` - Very transparent blue
 
 Currently implemented only on macOS (X11/Wayland have NULL stubs).
 

@@ -301,6 +301,19 @@ hint_bgcolor: #1c1c1e
 hint_fgcolor: #a1aba7
 hint_size: 20
 hint_border_radius: 3
+
+# Ripple effect (visual feedback on clicks and jumps)
+ripple_enabled: 1
+ripple_color: #00ff0060       # RGBA hex color (last 2 digits = alpha/transparency)
+ripple_duration: 300          # Animation duration in milliseconds
+ripple_max_radius: 50         # Maximum ripple radius in pixels
+ripple_line_width: 2          # Width of ripple circle line
+
+# Color examples for ripples:
+# ripple_color: #ff000080      # Semi-transparent red
+# ripple_color: #00ff00ff      # Opaque green
+# ripple_color: #0080ff40      # Very transparent blue
+# ripple_color: #ffff0060      # Semi-transparent yellow
 ```
 
 ## Wayland

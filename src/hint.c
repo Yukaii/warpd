@@ -168,6 +168,7 @@ static int hint_selection(screen_t scr, struct hint *_hints, size_t _nr_hints)
 			platform->mouse_move(scr, nx+1, ny+1);
 
 			platform->mouse_move(scr, nx, ny);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, nx, ny);
 			strcpy(last_selected_hint, buf);
 			break;
 		} else if (nr_matched == 0) {

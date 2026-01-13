@@ -132,8 +132,16 @@ struct input_event *grid_mode()
 			continue;
 		}
 
-		/* Timeout */
-		if (!ev || !ev->pressed)
+		/* Force redraw if ripples are active (for animation) */
+		if (!ev) {
+			if (platform->has_active_ripples && platform->has_active_ripples(scr)) {
+				redraw(mx, my, 1);
+			}
+			continue;
+		}
+
+		/* No event or key release */
+		if (!ev->pressed)
 			continue;
 
 		if ((idx = config_input_match(ev, "grid_keys")) && idx <= nc * nr) {
@@ -146,6 +154,7 @@ struct input_event *grid_mode()
 			my += grid_height / 2;
 
 			platform->mouse_move(scr, mx, my);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
@@ -154,6 +163,7 @@ struct input_event *grid_mode()
 			grid_height /= 2;
 
 			platform->mouse_move(scr, mx, my);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
@@ -162,6 +172,7 @@ struct input_event *grid_mode()
 			grid_height /= 2;
 
 			platform->mouse_move(scr, mx, my);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
@@ -170,6 +181,7 @@ struct input_event *grid_mode()
 			grid_width /= 2;
 
 			platform->mouse_move(scr, mx, my);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
@@ -178,11 +190,14 @@ struct input_event *grid_mode()
 			grid_width /= 2;
 
 			platform->mouse_move(scr, mx, my);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
 		if (config_input_match(ev, "buttons") ||
 			config_input_match(ev, "oneshot_buttons")) {
+			platform->mouse_get_position(NULL, &mx, &my);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 			goto exit;
 		}
 
