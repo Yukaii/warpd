@@ -96,6 +96,8 @@ struct platform {
 
 	void (*scroll)(int direction);
 	void (*scroll_amount)(int direction, int amount);
+	void (*trigger_ripple)(screen_t scr, int x, int y);
+	int (*has_active_ripples)(screen_t scr);
 
 	void (*copy_selection)();
 

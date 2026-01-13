@@ -66,6 +66,18 @@ void macos_draw_box(struct screen *scr, NSColor *col, float x, float y, float w,
 	[path fill];
 }
 
+void macos_draw_circle(struct screen *scr, NSColor *col, float x, float y, float radius, float lineWidth)
+{
+	[col setStroke];
+
+	/* Convert to LLO - for circles we need to center correctly */
+	y = scr->h - y;
+
+	NSBezierPath *path = [NSBezierPath bezierPath];
+	[path appendBezierPathWithOvalInRect:NSMakeRect(x - radius, y - radius, radius * 2, radius * 2)];
+	[path setLineWidth:lineWidth];
+	[path stroke];
+}
 
 NSColor *nscolor_from_hex(const char *str)
 {
@@ -314,6 +326,8 @@ static void *mainloop(void *arg)
 		.screen_list = osx_screen_list,
 		.scroll = osx_scroll,
 		.scroll_amount = osx_scroll_amount,
+		.trigger_ripple = osx_trigger_ripple,
+		.has_active_ripples = osx_has_active_ripples,
 		.monitor_file = osx_monitor_file,
 	};
 

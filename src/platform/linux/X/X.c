@@ -261,4 +261,6 @@ void x_init(struct platform *platform)
 	platform->screen_list = x_screen_list;
 	platform->scroll = x_scroll;
 	platform->scroll_amount = x_scroll_amount;
+	platform->trigger_ripple = NULL;  // TODO: Implement ripple for X11
+	platform->has_active_ripples = NULL;  // TODO: Implement ripple for X11
 }

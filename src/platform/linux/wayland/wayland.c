@@ -328,4 +328,6 @@ void wayland_init(struct platform *platform)
 	platform->screen_list = way_screen_list;
 	platform->scroll = way_scroll;
 	platform->scroll_amount = way_scroll_amount;
+	platform->trigger_ripple = NULL;  // TODO: Implement ripple for Wayland
+	platform->has_active_ripples = NULL;  // TODO: Implement ripple for Wayland
 }

@@ -143,6 +143,10 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		}
 
 		if (!ev)  {
+			// Force redraw if ripples are active (for animation)
+			if (platform->has_active_ripples && platform->has_active_ripples(scr)) {
+				redraw(scr, mx, my, !show_cursor);
+			}
 			continue;
 		} else if (config_input_match(ev, "scroll_down")) {
 			redraw(scr, mx, my, 1);
@@ -218,27 +222,35 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			goto next;
 		}
 
-		if (config_input_match(ev, "top"))
+		if (config_input_match(ev, "top")) {
 			move(scr, mx, cursz / 2, !show_cursor);
-		else if (config_input_match(ev, "bottom"))
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, cursz / 2);
+		} else if (config_input_match(ev, "bottom")) {
 			move(scr, mx, sh - cursz / 2, !show_cursor);
-		else if (config_input_match(ev, "middle"))
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, sh - cursz / 2);
+		} else if (config_input_match(ev, "middle")) {
 			move(scr, mx, sh / 2, !show_cursor);
-		else if (config_input_match(ev, "start"))
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, sh / 2);
+		} else if (config_input_match(ev, "start")) {
 			move(scr, 1, my, !show_cursor);
-		else if (config_input_match(ev, "end"))
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, 1, my);
+		} else if (config_input_match(ev, "end")) {
 			move(scr, sw - cursz, my, !show_cursor);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, sw - cursz, my);
+		}
 		else if (config_input_match(ev, "hist_back")) {
 			hist_add(mx, my);
 			hist_prev();
 			hist_get(&mx, &my);
 
 			move(scr, mx, my, !show_cursor);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 		} else if (config_input_match(ev, "hist_forward")) {
 			hist_next();
 			hist_get(&mx, &my);
 
 			move(scr, mx, my, !show_cursor);
+			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 		} else if (config_input_match(ev, "drag")) {
 			dragging = !dragging;
 			if (dragging)
@@ -271,9 +283,11 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 
 				hist_add(mx, my);
 				histfile_add(mx, my);
+				if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 				platform->mouse_click(btn);
 			} else if ((btn = config_input_match(ev, "oneshot_buttons"))) {
 				hist_add(mx, my);
+				if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
 				platform->mouse_click(btn);
 
 				const int timeout = config_get_int("oneshot_timeout");

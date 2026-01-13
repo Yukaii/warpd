@@ -27,6 +27,15 @@
 
 #define MAX_DRAWING_HOOKS 32
 #define MAX_BOXES 32
+#define MAX_RIPPLES 10
+
+struct ripple {
+	int x;
+	int y;
+	float radius;
+	uint64_t start_time;
+	int active;
+};
 
 struct box {
 	int x;
@@ -66,6 +75,9 @@ struct screen {
 	struct box boxes[MAX_BOXES];
 	size_t nr_boxes;
 
+	struct ripple ripples[MAX_RIPPLES];
+	size_t nr_ripples;
+
 	struct window *overlay;
 
 };
@@ -88,6 +100,8 @@ void macos_init_screen();
 
 void macos_draw_box(struct screen *scr, NSColor *col, float x, float y, float w,
 		    float h, float r);
+
+void macos_draw_circle(struct screen *scr, NSColor *col, float x, float y, float radius, float lineWidth);
 
 void macos_draw_text(struct screen *scr, NSColor *col, const char *font, int x,
 		     int y, int w, int h, const char *s);
@@ -120,6 +134,8 @@ void osx_screen_get_dimensions(screen_t scr, int *w, int *h);
 void osx_screen_draw_box(screen_t scr, int x, int y, int w, int h, const char *color);
 void osx_screen_clear(screen_t scr);
 void osx_screen_list(screen_t scr[MAX_SCREENS], size_t *n);
+void osx_trigger_ripple(screen_t scr, int x, int y);
+int osx_has_active_ripples(screen_t scr);
 void osx_init_hint(const char *bg, const char *fg, int border_radius, const char *font_family);
 void osx_hint_draw(struct screen *scr, struct hint *hints, size_t n);
 void osx_scroll(int direction);
