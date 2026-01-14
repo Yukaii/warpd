@@ -139,7 +139,9 @@ Pressing _v_ whilst in normal mode toggles a drag operation. The cursor can
 then be warped around the screen as normal in order to select text or move
 objects until the drag key is hit again or a mouse button is pressed.
 Additionally, the *copy_and_exit* key (_c_) may be used to copy the selected
-text to the system clipboard and terminate the current session.
+text to the system clipboard and terminate the current session. Keys bound via
+*hold_buttons* will press the corresponding mouse button while held (unbound by
+default).
 
 ## Wayland
 

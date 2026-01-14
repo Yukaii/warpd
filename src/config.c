@@ -44,6 +44,8 @@ static struct {
     {"buttons", "m , .",
      "A space separated list of mouse buttons (2 is middle click).",
      OPT_BUTTON},
+    {"hold_buttons", "unbind",
+     "Mouse buttons to hold while the key is pressed.", OPT_BUTTON},
     {"drag_button", "1", "The mouse buttton used for dragging.", OPT_INT},
     {"oneshot_buttons", "n - /", "Oneshot mouse buttons (deactivate on click).",
      OPT_BUTTON},

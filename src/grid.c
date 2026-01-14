@@ -10,30 +10,30 @@ static int grid_width;
 static int grid_height;
 static screen_t scr;
 
-static void draw_grid(screen_t scr,
-		      const char *color, int sz,
-		      int nc, int nr,
+static void draw_grid(screen_t scr, const char *color, int sz, int nc, int nr,
 		      int x, int y, int w, int h)
 {
 	int i;
 
-	const int ygap = (h - ((nr+1)*sz))/nr;
-	const int xgap = (w - ((nc+1)*sz))/nc;
+	const int ygap = (h - ((nr + 1) * sz)) / nr;
+	const int xgap = (w - ((nc + 1) * sz)) / nc;
 
 	if (xgap < 0 || ygap < 0)
 		return;
 
-	for (i = 0; i < nr+1; i++)
-		platform->screen_draw_box(scr, x, y+(ygap+sz)*i, w, sz, color);
+	for (i = 0; i < nr + 1; i++)
+		platform->screen_draw_box(scr, x, y + (ygap + sz) * i, w, sz,
+					  color);
 
-	for (i = 0; i < nc+1; i++)
-		platform->screen_draw_box(scr, x+(xgap+sz)*i, y, sz, h, color);
+	for (i = 0; i < nc + 1; i++)
+		platform->screen_draw_box(scr, x + (xgap + sz) * i, y, sz, h,
+					  color);
 }
 
 static void redraw(int mx, int my, int force)
 {
-	const int x = mx - grid_width/2;
-	const int y = my - grid_height/2;
+	const int x = mx - grid_width / 2;
+	const int y = my - grid_height / 2;
 
 	const int nc = config_get_int("grid_nc");
 	const int nr = config_get_int("grid_nr");
@@ -58,21 +58,15 @@ static void redraw(int mx, int my, int force)
 	platform->screen_clear(scr);
 
 	/* Draw the border. */
-	draw_grid(scr, gbcol,
-		  gsz+gbsz*2,
-		  nc, nr,
-		  x, y, gw, gh);
+	draw_grid(scr, gbcol, gsz + gbsz * 2, nc, nr, x, y, gw, gh);
 
 	/* Draw the grid. */
-	draw_grid(scr, gcol,
-		  gsz, nc, nr,
-		  x+gbsz, y+gbsz,
-		  gw-gbsz*2, gh-gbsz*2);
+	draw_grid(scr, gcol, gsz, nc, nr, x + gbsz, y + gbsz, gw - gbsz * 2,
+		  gh - gbsz * 2);
 
-	platform->screen_draw_box(scr,
-			x+gw/2-cursz/2, y+gh/2-cursz/2,
-			cursz, cursz,
-			config_get("cursor_color"));
+	platform->screen_draw_box(scr, x + gw / 2 - cursz / 2,
+				  y + gh / 2 - cursz / 2, cursz, cursz,
+				  config_get("cursor_color"));
 
 	platform->commit();
 }
@@ -99,24 +93,14 @@ struct input_event *grid_mode()
 	redraw(mx, my, 1);
 
 	const char *keys[] = {
-		"grid_up",
-		"grid_down",
-		"grid_right",
-		"grid_left",
-		"grid_cut_up",
-		"grid_cut_down",
-		"grid_cut_right",
-		"grid_cut_left",
-		"grid_keys",
+	    "grid_up",	      "grid_down",     "grid_right",
+	    "grid_left",      "grid_cut_up",   "grid_cut_down",
+	    "grid_cut_right", "grid_cut_left", "grid_keys",
 
-		"buttons",
-		"oneshot_buttons",
+	    "buttons",	      "hold_buttons",  "oneshot_buttons",
 
-		"grid",
-		"hint",
-		"exit",
-		"drag",
-		"grid_exit",
+	    "grid",	      "hint",	       "exit",
+	    "drag",	      "grid_exit",
 	};
 
 	config_input_whitelist(keys, sizeof keys / sizeof keys[0]);
@@ -127,26 +111,42 @@ struct input_event *grid_mode()
 		ev = platform->input_next_event(10);
 		platform->mouse_get_position(NULL, &mx, &my);
 
-		if (mouse_process_key(ev, "grid_up", "grid_down", "grid_left", "grid_right")) {
+		if (mouse_process_key(ev, "grid_up", "grid_down", "grid_left",
+				      "grid_right")) {
 			redraw(mx, my, 0);
 			continue;
 		}
 
 		/* Force redraw if ripples are active (for animation) */
 		if (!ev) {
-			if (platform->has_active_ripples && platform->has_active_ripples(scr)) {
+			if (platform->has_active_ripples &&
+			    platform->has_active_ripples(scr)) {
 				redraw(mx, my, 1);
 			}
 			continue;
+		}
+
+		{
+			int btn = config_input_match(ev, "hold_buttons");
+			if (btn) {
+				if (ev->pressed)
+					platform->mouse_down(btn);
+				else
+					platform->mouse_up(btn);
+				continue;
+			}
 		}
 
 		/* No event or key release */
 		if (!ev->pressed)
 			continue;
 
-		if ((idx = config_input_match(ev, "grid_keys")) && idx <= nc * nr) {
-			my = (my - grid_height / 2) + (grid_height / nr) * ((idx-1) / nc);
-			mx = (mx - grid_width / 2) + (grid_width / nc) * ((idx-1) % nc);
+		if ((idx = config_input_match(ev, "grid_keys")) &&
+		    idx <= nc * nr) {
+			my = (my - grid_height / 2) +
+			     (grid_height / nr) * ((idx - 1) / nc);
+			mx = (mx - grid_width / 2) +
+			     (grid_width / nc) * ((idx - 1) % nc);
 
 			grid_height /= nr;
 			grid_width /= nc;
@@ -154,50 +154,56 @@ struct input_event *grid_mode()
 			my += grid_height / 2;
 
 			platform->mouse_move(scr, mx, my);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
 		if (config_input_match(ev, "grid_cut_up")) {
-			my -= grid_height/4;
+			my -= grid_height / 4;
 			grid_height /= 2;
 
 			platform->mouse_move(scr, mx, my);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
 		if (config_input_match(ev, "grid_cut_down")) {
-			my += grid_height/4;
+			my += grid_height / 4;
 			grid_height /= 2;
 
 			platform->mouse_move(scr, mx, my);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
 		if (config_input_match(ev, "grid_cut_left")) {
-			mx -= grid_width/4;
+			mx -= grid_width / 4;
 			grid_width /= 2;
 
 			platform->mouse_move(scr, mx, my);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
 		if (config_input_match(ev, "grid_cut_right")) {
-			mx += grid_width/4;
+			mx += grid_width / 4;
 			grid_width /= 2;
 
 			platform->mouse_move(scr, mx, my);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 			redraw(mx, my, 0);
 		}
 
 		if (config_input_match(ev, "buttons") ||
-			config_input_match(ev, "oneshot_buttons")) {
+		    config_input_match(ev, "oneshot_buttons")) {
 			platform->mouse_get_position(NULL, &mx, &my);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 			goto exit;
 		}
 

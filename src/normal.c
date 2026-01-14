@@ -13,7 +13,8 @@ static void redraw(screen_t scr, int x, int y, int hide_cursor)
 	platform->screen_get_dimensions(scr, &sw, &sh);
 
 	const int gap = 10;
-	const int indicator_size = (config_get_int("indicator_size") * sh) / 1080;
+	const int indicator_size =
+	    (config_get_int("indicator_size") * sh) / 1080;
 	const char *indicator_color = config_get("indicator_color");
 	const char *curcol = config_get("cursor_color");
 	const char *indicator = config_get("indicator");
@@ -22,19 +23,24 @@ static void redraw(screen_t scr, int x, int y, int hide_cursor)
 	platform->screen_clear(scr);
 
 	if (!hide_cursor)
-		platform->screen_draw_box(scr, x+1, y-cursz/2,
-				cursz, cursz,
-				curcol);
-
+		platform->screen_draw_box(scr, x + 1, y - cursz / 2, cursz,
+					  cursz, curcol);
 
 	if (!strcmp(indicator, "bottomleft"))
-		platform->screen_draw_box(scr, gap, sh-indicator_size-gap, indicator_size, indicator_size, indicator_color);
+		platform->screen_draw_box(scr, gap, sh - indicator_size - gap,
+					  indicator_size, indicator_size,
+					  indicator_color);
 	else if (!strcmp(indicator, "topleft"))
-		platform->screen_draw_box(scr, gap, gap, indicator_size, indicator_size, indicator_color);
+		platform->screen_draw_box(scr, gap, gap, indicator_size,
+					  indicator_size, indicator_color);
 	else if (!strcmp(indicator, "topright"))
-		platform->screen_draw_box(scr, sw-indicator_size-gap, gap, indicator_size, indicator_size, indicator_color);
+		platform->screen_draw_box(scr, sw - indicator_size - gap, gap,
+					  indicator_size, indicator_size,
+					  indicator_color);
 	else if (!strcmp(indicator, "bottomright"))
-		platform->screen_draw_box(scr, sw-indicator_size-gap, sh-indicator_size-gap, indicator_size, indicator_size, indicator_color);
+		platform->screen_draw_box(
+		    scr, sw - indicator_size - gap, sh - indicator_size - gap,
+		    indicator_size, indicator_size, indicator_color);
 
 	platform->commit();
 }
@@ -58,6 +64,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 	int mx, my;
 	int dragging = 0;
 	int show_cursor = !system_cursor;
+	int held_buttons[8] = {0};
 
 	int n = sscanf(blink_interval, "%d %d", &on_time, &off_time);
 	assert(n > 0);
@@ -65,38 +72,40 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		off_time = on_time;
 
 	const char *keys[] = {
-		"accelerator",
-		"bottom",
-		"buttons",
-		"copy_and_exit",
-		"decelerator",
-		"down",
-		"drag",
-		"end",
-		"exit",
-		"grid",
-		"hint",
-		"hint2",
-		"hist_back",
-		"hist_forward",
-		"history",
-		"left",
-		"middle",
-		"oneshot_buttons",
-		"print",
-		"right",
-		"screen",
-		"scroll_down",
-		"scroll_end",
-		"scroll_home",
-		"scroll_left",
-		"scroll_page_down",
-		"scroll_page_up",
-		"scroll_right",
-		"scroll_up",
-		"start",
-		"top",
-		"up",
+	    "accelerator",
+	    "bottom",
+	    "buttons",
+	    "hold_buttons",
+	    "copy_and_exit",
+
+	    "decelerator",
+	    "down",
+	    "drag",
+	    "end",
+	    "exit",
+	    "grid",
+	    "hint",
+	    "hint2",
+	    "hist_back",
+	    "hist_forward",
+	    "history",
+	    "left",
+	    "middle",
+	    "oneshot_buttons",
+	    "print",
+	    "right",
+	    "screen",
+	    "scroll_down",
+	    "scroll_end",
+	    "scroll_home",
+	    "scroll_left",
+	    "scroll_page_down",
+	    "scroll_page_up",
+	    "scroll_right",
+	    "scroll_up",
+	    "start",
+	    "top",
+	    "up",
 	};
 
 	platform->input_grab_keyboard();
@@ -125,11 +134,13 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		platform->mouse_get_position(&scr, &mx, &my);
 
 		if (!system_cursor && on_time) {
-			if (show_cursor && (time - last_blink_update) >= on_time) {
+			if (show_cursor &&
+			    (time - last_blink_update) >= on_time) {
 				show_cursor = 0;
 				redraw(scr, mx, my, !show_cursor);
 				last_blink_update = time;
-			} else if (!show_cursor && (time - last_blink_update) >= off_time) {
+			} else if (!show_cursor &&
+				   (time - last_blink_update) >= off_time) {
 				show_cursor = 1;
 				redraw(scr, mx, my, !show_cursor);
 				last_blink_update = time;
@@ -142,9 +153,10 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			continue;
 		}
 
-		if (!ev)  {
+		if (!ev) {
 			// Force redraw if ripples are active (for animation)
-			if (platform->has_active_ripples && platform->has_active_ripples(scr)) {
+			if (platform->has_active_ripples &&
+			    platform->has_active_ripples(scr)) {
 				redraw(scr, mx, my, !show_cursor);
 			}
 			continue;
@@ -182,28 +194,32 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				scroll_decelerate();
 		} else if (config_input_match(ev, "scroll_page_down")) {
 			if (ev->pressed) {
-				int amount = config_get_int("scroll_page_amount");
+				int amount =
+				    config_get_int("scroll_page_amount");
 				scroll_stop();
 				redraw(scr, mx, my, 1);
 				platform->scroll_amount(SCROLL_DOWN, amount);
 			}
 		} else if (config_input_match(ev, "scroll_page_up")) {
 			if (ev->pressed) {
-				int amount = config_get_int("scroll_page_amount");
+				int amount =
+				    config_get_int("scroll_page_amount");
 				scroll_stop();
 				redraw(scr, mx, my, 1);
 				platform->scroll_amount(SCROLL_UP, amount);
 			}
 		} else if (config_input_match(ev, "scroll_home")) {
 			if (ev->pressed) {
-				int amount = config_get_int("scroll_home_amount");
+				int amount =
+				    config_get_int("scroll_home_amount");
 				scroll_stop();
 				redraw(scr, mx, my, 1);
 				platform->scroll_amount(SCROLL_UP, amount);
 			}
 		} else if (config_input_match(ev, "scroll_end")) {
 			if (ev->pressed) {
-				int amount = config_get_int("scroll_home_amount");
+				int amount =
+				    config_get_int("scroll_home_amount");
 				scroll_stop();
 				redraw(scr, mx, my, 1);
 				platform->scroll_amount(SCROLL_DOWN, amount);
@@ -214,49 +230,81 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			else
 				mouse_normal();
 		} else if (config_input_match(ev, "decelerator")) {
-			if (ev->pressed)
-				mouse_slow();
-			else
-				mouse_normal();
-		} else if (!ev->pressed) {
+			mouse_slow();
+		}
+
+		{
+			int btn = config_input_match(ev, "hold_buttons");
+			if (btn) {
+				const int drag_button =
+				    config_get_int("drag_button");
+				if (dragging && btn == drag_button)
+					goto next;
+				if (btn < (int)(sizeof(held_buttons) /
+						sizeof(held_buttons[0]))) {
+					if (ev->pressed) {
+						if (!held_buttons[btn]) {
+							held_buttons[btn] = 1;
+							platform->mouse_down(
+							    btn);
+						}
+					} else if (held_buttons[btn]) {
+						held_buttons[btn] = 0;
+						platform->mouse_up(btn);
+					}
+				}
+				goto next;
+			}
+		}
+
+		if (!ev->pressed) {
 			goto next;
 		}
 
 		if (config_input_match(ev, "top")) {
 			move(scr, mx, cursz / 2, !show_cursor);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, cursz / 2);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, cursz / 2);
 		} else if (config_input_match(ev, "bottom")) {
 			move(scr, mx, sh - cursz / 2, !show_cursor);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, sh - cursz / 2);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx,
+							 sh - cursz / 2);
 		} else if (config_input_match(ev, "middle")) {
 			move(scr, mx, sh / 2, !show_cursor);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, sh / 2);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, sh / 2);
 		} else if (config_input_match(ev, "start")) {
 			move(scr, 1, my, !show_cursor);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, 1, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, 1, my);
 		} else if (config_input_match(ev, "end")) {
 			move(scr, sw - cursz, my, !show_cursor);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, sw - cursz, my);
-		}
-		else if (config_input_match(ev, "hist_back")) {
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, sw - cursz, my);
+		} else if (config_input_match(ev, "hist_back")) {
 			hist_add(mx, my);
 			hist_prev();
 			hist_get(&mx, &my);
 
 			move(scr, mx, my, !show_cursor);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 		} else if (config_input_match(ev, "hist_forward")) {
 			hist_next();
 			hist_get(&mx, &my);
 
 			move(scr, mx, my, !show_cursor);
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, mx, my);
 		} else if (config_input_match(ev, "drag")) {
 			dragging = !dragging;
 			if (dragging)
-				platform->mouse_down(config_get_int("drag_button"));
+				platform->mouse_down(
+				    config_get_int("drag_button"));
 			else
-				platform->mouse_up(config_get_int("drag_button"));
+				platform->mouse_up(
+				    config_get_int("drag_button"));
 		} else if (config_input_match(ev, "copy_and_exit")) {
 			platform->mouse_up(config_get_int("drag_button"));
 			platform->copy_selection();
@@ -283,23 +331,29 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 
 				hist_add(mx, my);
 				histfile_add(mx, my);
-				if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+				if (platform->trigger_ripple)
+					platform->trigger_ripple(scr, mx, my);
 				platform->mouse_click(btn);
-			} else if ((btn = config_input_match(ev, "oneshot_buttons"))) {
+			} else if ((btn = config_input_match(
+					ev, "oneshot_buttons"))) {
 				hist_add(mx, my);
-				if (platform->trigger_ripple) platform->trigger_ripple(scr, mx, my);
+				if (platform->trigger_ripple)
+					platform->trigger_ripple(scr, mx, my);
 				platform->mouse_click(btn);
 
-				const int timeout = config_get_int("oneshot_timeout");
+				const int timeout =
+				    config_get_int("oneshot_timeout");
 
 				while (1) {
-					struct input_event *ev = platform->input_next_event(timeout);
+					struct input_event *ev =
+					    platform->input_next_event(timeout);
 
 					if (!ev)
 						break;
 
 					if (ev && ev->pressed &&
-						config_input_match(ev, "oneshot_buttons")) {
+					    config_input_match(
+						ev, "oneshot_buttons")) {
 						platform->mouse_click(btn);
 					}
 				}
@@ -314,6 +368,11 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 	}
 
 exit:
+	for (size_t i = 1; i < sizeof(held_buttons) / sizeof(held_buttons[0]);
+	     i++) {
+		if (held_buttons[i])
+			platform->mouse_up(i);
+	}
 	platform->mouse_show();
 	platform->screen_clear(scr);
 

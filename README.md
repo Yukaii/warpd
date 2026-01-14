@@ -250,6 +250,7 @@ A more comprehensive description can be found in the [man page](warpd.1.md) (alo
 | `n` | Left Click (oneshot) | Click and exit normal mode |
 | `-` | Middle Click (oneshot) | Middle click and exit normal mode |
 | `/` | Right Click (oneshot) | Right click and exit normal mode |
+| `hold_buttons` | Hold Button | Hold mouse button while key is held (unbound by default) |
 | `v` | Toggle Drag Mode | Enter/exit visual (drag) mode |
 | `c` | Copy & Exit | Send copy command and exit |
 
@@ -315,6 +316,10 @@ left: a
 down: s
 up: w
 right: d
+
+# Hold mouse buttons while key pressed
+hold_buttons: unbind
+# hold_buttons: m , .
 
 # Hint font (monospace recommended for distinguishing I/l/1)
 # macOS PostScript names: Menlo-Regular (default), Monaco, Courier
