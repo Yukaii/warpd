@@ -255,19 +255,29 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			}
 		} else if (config_input_match(ev, "scroll_home")) {
 			if (ev->pressed) {
-				int amount =
-				    config_get_int("scroll_home_amount");
 				scroll_stop();
 				redraw(scr, mx, my, 1, rapid_mode);
-				platform->scroll_amount(SCROLL_UP, amount);
+				if (platform->key_tap) {
+					/* Cmd+Up = Home on macOS */
+					uint8_t up_code = platform->input_special_to_code("uparrow");
+					platform->key_tap(up_code, PLATFORM_MOD_META);
+				} else {
+					int amount = config_get_int("scroll_home_amount");
+					platform->scroll_amount(SCROLL_UP, amount);
+				}
 			}
 		} else if (config_input_match(ev, "scroll_end")) {
 			if (ev->pressed) {
-				int amount =
-				    config_get_int("scroll_home_amount");
 				scroll_stop();
 				redraw(scr, mx, my, 1, rapid_mode);
-				platform->scroll_amount(SCROLL_DOWN, amount);
+				if (platform->key_tap) {
+					/* Cmd+Down = End on macOS */
+					uint8_t down_code = platform->input_special_to_code("downarrow");
+					platform->key_tap(down_code, PLATFORM_MOD_META);
+				} else {
+					int amount = config_get_int("scroll_home_amount");
+					platform->scroll_amount(SCROLL_DOWN, amount);
+				}
 			}
 		} else if (config_input_match(ev, "accelerator")) {
 			if (ev->pressed)

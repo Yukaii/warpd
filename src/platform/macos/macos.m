@@ -345,6 +345,7 @@ static void *mainloop(void *arg)
 		.screen_list = osx_screen_list,
 		.scroll = osx_scroll,
 		.scroll_amount = osx_scroll_amount,
+		.key_tap = osx_key_tap,
 		.trigger_ripple = osx_trigger_ripple,
 		.has_active_ripples = osx_has_active_ripples,
 		.monitor_file = osx_monitor_file,

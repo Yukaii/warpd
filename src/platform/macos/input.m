@@ -350,6 +350,40 @@ void send_key(uint8_t code, int pressed)
 	});
 }
 
+void osx_key_tap(uint8_t code, uint8_t mods)
+{
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		CGEventFlags flags = 0;
+
+		if (mods & PLATFORM_MOD_CONTROL)
+			flags |= kCGEventFlagMaskControl;
+		if (mods & PLATFORM_MOD_SHIFT)
+			flags |= kCGEventFlagMaskShift;
+		if (mods & PLATFORM_MOD_META)
+			flags |= kCGEventFlagMaskCommand;
+		if (mods & PLATFORM_MOD_ALT)
+			flags |= kCGEventFlagMaskAlternate;
+
+		/* warpd uses 1-indexed keycodes (Apple keycode + 1) */
+		CGKeyCode keycode = code - 1;
+
+		/* Mark as passthrough so warpd's grab doesn't intercept it */
+		passthrough_keys[code] += 2; /* +2 for down and up events */
+
+		CGEventRef ev_down = CGEventCreateKeyboardEvent(NULL, keycode, true);
+		CGEventRef ev_up = CGEventCreateKeyboardEvent(NULL, keycode, false);
+
+		CGEventSetFlags(ev_down, flags);
+		CGEventSetFlags(ev_up, flags);
+
+		CGEventPost(kCGHIDEventTap, ev_down);
+		CGEventPost(kCGHIDEventTap, ev_up);
+
+		CFRelease(ev_down);
+		CFRelease(ev_up);
+	});
+}
+
 void osx_input_ungrab_keyboard()
 {
 	dispatch_sync(dispatch_get_main_queue(), ^{

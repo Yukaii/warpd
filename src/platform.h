@@ -106,6 +106,10 @@ struct platform {
 
 	void (*scroll)(int direction);
 	void (*scroll_amount)(int direction, int amount);
+
+	/* Emulate a key tap (press and release) with optional modifiers */
+	void (*key_tap)(uint8_t code, uint8_t mods);
+
 	void (*trigger_ripple)(screen_t scr, int x, int y);
 	int (*has_active_ripples)(screen_t scr);
 
