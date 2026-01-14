@@ -72,6 +72,7 @@ struct platform {
     void (*mouse_click)(int btn);
     void (*scroll)(int direction);
     void (*scroll_amount)(int direction, int amount);
+    void (*key_tap)(uint8_t code, uint8_t mods);  // Emulate key tap (macOS only)
     void (*input_grab_keyboard)();
     uint8_t (*input_lookup_code)(const char *name, int *shifted);
     char (*input_code_to_qwerty)(uint8_t code);
@@ -341,11 +342,17 @@ warpd has two scroll modes:
 - Update: `scroll_tick()` called every event loop iteration (10ms)
 
 **Instant Scroll** (no momentum):
-- Used by: `scroll_page_down`, `scroll_page_up`, `scroll_home`, `scroll_end`
+- Used by: `scroll_page_down`, `scroll_page_up`
 - Implementation: `platform->scroll_amount(direction, amount)` sends large single event
 - macOS: Uses `CGEventCreateScrollWheelEvent()` with pixel units
 - X11: Loops button press events (buttons 4/5/6/7)
-- Amounts: Configurable via `scroll_page_amount` (default 800), `scroll_home_amount` (default 100000)
+- Amounts: Configurable via `scroll_page_amount` (default 800)
+
+**Home/End Scroll** (keyboard emulation):
+- Used by: `scroll_home`, `scroll_end`
+- macOS: Uses `platform->key_tap()` to send Cmd+Up (Home) / Cmd+Down (End)
+- Other platforms: Falls back to `scroll_amount` with `scroll_home_amount` (default 100000)
+- Why keyboard emulation: Many apps cap or smooth large scroll events, but reliably handle Cmd+Up/Down as native Home/End shortcuts
 
 ### macOS Accessibility API Usage
 
@@ -360,6 +367,29 @@ The fork uses macOS Accessibility API in two cases:
 2. **Focused Application Detection**:
    - `get_focused_app()` helper retrieves current focused app
    - Used to determine when to apply Kitty-specific workarounds
+
+### macOS Key Emulation
+
+The `platform->key_tap(code, mods)` function emits synthetic keyboard events:
+
+**Implementation** (`src/platform/macos/input.m:osx_key_tap()`):
+- Creates `CGEventCreateKeyboardEvent()` for key down and up
+- Sets modifier flags via `CGEventSetFlags()` (Cmd, Ctrl, Shift, Alt)
+- Posts events via `CGEventPost(kCGHIDEventTap, ...)`
+
+**Passthrough Mechanism**:
+- warpd intercepts all keyboard events via an event tap
+- Synthetic events must be marked in `passthrough_keys[code]` array
+- Without this, warpd would swallow its own emitted key events
+- `passthrough_keys[code] += 2` marks both down and up events to pass through
+
+**Usage**:
+```c
+if (platform->key_tap) {
+    uint8_t code = platform->input_special_to_code("uparrow");
+    platform->key_tap(code, PLATFORM_MOD_META);  /* Cmd+Up */
+}
+```
 
 ### Testing on macOS
 
