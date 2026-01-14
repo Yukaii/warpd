@@ -21,44 +21,44 @@ uint64_t get_time_us()
 
 const char *get_data_path(const char *file)
 {
-	static char path[PATH_MAX];
+	static char data_path[PATH_MAX];
 
 	if (getenv("XDG_DATA_DIR")) {
-		sprintf(path, "%s/warpd", getenv("XDG_DATA_DIR"));
-		mkdir(path, 0700);
+		sprintf(data_path, "%s/warpd", getenv("XDG_DATA_DIR"));
+		mkdir(data_path, 0700);
 	} else {
-		sprintf(path, "%s/.local", getenv("HOME"));
-		mkdir(path, 0700);
-		strcat(path, "/share");
-		mkdir(path, 0700);
-		strcat(path, "/warpd");
-		mkdir(path, 0700);
+		sprintf(data_path, "%s/.local", getenv("HOME"));
+		mkdir(data_path, 0700);
+		strcat(data_path, "/share");
+		mkdir(data_path, 0700);
+		strcat(data_path, "/warpd");
+		mkdir(data_path, 0700);
 	}
 
-	strcat(path, "/");
-	strcat(path, file);
+	strcat(data_path, "/");
+	strcat(data_path, file);
 
-	return path;
+	return data_path;
 }
 
 const char *get_config_path(const char *file)
 {
-	static char path[PATH_MAX];
+	static char config_path[PATH_MAX];
 
 	if (getenv("XDG_CONFIG_HOME")) {
-		sprintf(path, "%s/warpd", getenv("XDG_CONFIG_HOME"));
-		mkdir(path, 0700);
+		sprintf(config_path, "%s/warpd", getenv("XDG_CONFIG_HOME"));
+		mkdir(config_path, 0700);
 	} else {
-		sprintf(path, "%s/.config", getenv("HOME"));
-		mkdir(path, 0700);
-		strcat(path, "/warpd");
-		mkdir(path, 0700);
+		sprintf(config_path, "%s/.config", getenv("HOME"));
+		mkdir(config_path, 0700);
+		strcat(config_path, "/warpd");
+		mkdir(config_path, 0700);
 	}
 
-	strcat(path, "/");
-	strcat(path, file);
+	strcat(config_path, "/");
+	strcat(config_path, file);
 
-	return path;
+	return config_path;
 }
 
 

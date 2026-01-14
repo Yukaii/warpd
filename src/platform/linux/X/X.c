@@ -256,6 +256,7 @@ void x_init(struct platform *platform)
 	platform->screen_clear = x_screen_clear;
 	platform->screen_clear_ripples = NULL;
 	platform->screen_draw_box = x_screen_draw_box;
+	platform->screen_draw_cursor = NULL;
 	platform->screen_get_dimensions = x_screen_get_dimensions;
 	platform->screen_list = x_screen_list;
 	platform->scroll = x_scroll;

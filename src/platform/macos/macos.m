@@ -340,6 +340,7 @@ static void *mainloop(void *arg)
 		.screen_clear = osx_screen_clear,
 		.screen_clear_ripples = osx_screen_clear_ripples,
 		.screen_draw_box = osx_screen_draw_box,
+		.screen_draw_cursor = osx_screen_draw_cursor,
 		.screen_get_dimensions = osx_screen_get_dimensions,
 		.screen_list = osx_screen_list,
 		.scroll = osx_scroll,

@@ -323,6 +323,10 @@ right: d
 hold_buttons: unbind
 # hold_buttons: m , .
 
+# Custom cursor (macOS cursor packs, uses warpd cursor)
+# cursor_pack: pointinghand
+# cursor_pack: ~/Library/Cursors/MyCursor.cursor
+
 # Rapid auto-click while rapid_mode is active
 rapid_mode: R
 rapid_click_interval: 40

@@ -6,14 +6,123 @@
 
 #include "macos.h"
 #include "../../warpd.h"
+#include <limits.h>
+#include <string.h>
 
 struct screen screens[32];
 size_t nr_screens;
+
+static NSImage *cursor_image = nil;
+static NSPoint cursor_hotspot = {0, 0};
+static char cursor_pack_path[PATH_MAX] = {0};
 
 static void draw_hook(void *arg, NSView *view)
 {
 	struct box *b = arg;
 	macos_draw_box(b->scr, b->color, b->x, b->y, b->w, b->h, 0);
+}
+
+static void cursor_draw_hook(void *arg, NSView *view)
+{
+	struct cursor_draw *cursor = arg;
+	if (!cursor->image)
+		return;
+
+	NSSize size = [cursor->image size];
+	float draw_x = cursor->x - cursor->hotspot.x;
+	float draw_y = cursor->scr->h - cursor->y + cursor->hotspot.y - size.height;
+
+	[cursor->image drawInRect:NSMakeRect(draw_x, draw_y, size.width, size.height)
+				 fromRect:NSZeroRect
+				operation:NSCompositingOperationSourceOver
+				 fraction:1.0];
+}
+
+static NSString *resolve_cursor_pack_path(const char *cursor_pack)
+{
+	if (!cursor_pack || !cursor_pack[0] || !strcmp(cursor_pack, "none"))
+		return nil;
+
+	NSString *name = [NSString stringWithUTF8String:cursor_pack];
+	name = [name stringByExpandingTildeInPath];
+
+	NSFileManager *fm = [NSFileManager defaultManager];
+	if ([name containsString:@"/"]) {
+		if ([fm fileExistsAtPath:name])
+			return name;
+		return nil;
+	}
+
+	NSString *systemCursorPath =
+	    @"/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/HIServices.framework/Versions/A/Resources/cursors";
+	NSArray<NSString *> *bases = @[
+	    [@"~/Library/Cursors" stringByExpandingTildeInPath],
+	    @"/Library/Cursors",
+	    systemCursorPath,
+	];
+	NSArray<NSString *> *suffixes = @[
+	    name,
+	    [name stringByAppendingString:@".cursor"],
+	];
+
+	for (NSString *base in bases) {
+		for (NSString *suffix in suffixes) {
+			NSString *candidate = [base stringByAppendingPathComponent:suffix];
+			if ([fm fileExistsAtPath:candidate])
+				return candidate;
+		}
+	}
+
+	return nil;
+}
+
+static int load_cursor_pack(const char *cursor_pack)
+{
+	NSString *bundle_path = resolve_cursor_pack_path(cursor_pack);
+	if (!bundle_path) {
+		cursor_image = nil;
+		cursor_pack_path[0] = '\0';
+		return 0;
+	}
+
+	const char *bundle_cstr = [bundle_path fileSystemRepresentation];
+	if (cursor_image && strcmp(cursor_pack_path, bundle_cstr) == 0)
+		return 1;
+
+	strncpy(cursor_pack_path, bundle_cstr, sizeof(cursor_pack_path) - 1);
+	cursor_pack_path[sizeof(cursor_pack_path) - 1] = '\0';
+
+	NSString *plist_path = [bundle_path stringByAppendingPathComponent:@"info.plist"];
+	NSDictionary *plist =
+	    [NSDictionary dictionaryWithContentsOfFile:plist_path];
+	NSNumber *hotx = plist[@"hotx-scaled"] ?: plist[@"hotx"];
+	NSNumber *hoty = plist[@"hoty-scaled"] ?: plist[@"hoty"];
+	cursor_hotspot = NSMakePoint(hotx ? hotx.floatValue : 0,
+				     hoty ? hoty.floatValue : 0);
+
+	NSArray<NSString *> *image_names = @[
+	    @"cursor.pdf",
+	    @"cursor.png",
+	    @"cursor.tiff",
+	];
+	NSFileManager *fm = [NSFileManager defaultManager];
+	NSString *image_path = nil;
+	for (NSString *image_name in image_names) {
+		NSString *candidate =
+		    [bundle_path stringByAppendingPathComponent:image_name];
+		if ([fm fileExistsAtPath:candidate]) {
+			image_path = candidate;
+			break;
+		}
+	}
+
+	if (!image_path) {
+		cursor_image = nil;
+		return 0;
+	}
+
+	cursor_image = [[NSImage alloc] initWithContentsOfFile:image_path];
+	return cursor_image != nil;
 }
 
 static void ripple_draw_hook(void *arg, NSView *view)
@@ -68,6 +177,25 @@ void osx_screen_draw_box(struct screen *scr, int x, int y, int w, int h, const c
 	window_register_draw_hook(scr->overlay, draw_hook, b);
 }
 
+int osx_screen_draw_cursor(struct screen *scr, int x, int y)
+{
+	const char *cursor_pack = config_get("cursor_pack");
+	if (!cursor_pack || !cursor_pack[0] || !strcmp(cursor_pack, "none"))
+		return 0;
+
+	if (!load_cursor_pack(cursor_pack))
+		return 0;
+
+	scr->cursor.scr = scr;
+	scr->cursor.x = x;
+	scr->cursor.y = y;
+	scr->cursor.image = cursor_image;
+	scr->cursor.hotspot = cursor_hotspot;
+
+	window_register_draw_hook(scr->overlay, cursor_draw_hook, &scr->cursor);
+	return 1;
+}
+
 void osx_screen_list(struct screen *rscreens[MAX_SCREENS], size_t *n)
 {
 	size_t i;
@@ -81,6 +209,11 @@ void osx_screen_list(struct screen *rscreens[MAX_SCREENS], size_t *n)
 void osx_screen_clear(struct screen *scr)
 {
 	scr->nr_boxes = 0;
+
+	// Overlay may be NULL during initialization
+	if (!scr->overlay)
+		return;
+
 	scr->overlay->nr_hooks = 0;
 
 	// Keep active ripples and register their draw hooks

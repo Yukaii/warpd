@@ -47,6 +47,14 @@ struct box {
 	NSColor *color;
 };
 
+struct cursor_draw {
+	int x;
+	int y;
+	NSImage *image;
+	NSPoint hotspot;
+	struct screen *scr;
+};
+
 size_t nr_boxes;
 
 struct drawing_hook {
@@ -74,6 +82,8 @@ struct screen {
 
 	struct box boxes[MAX_BOXES];
 	size_t nr_boxes;
+
+	struct cursor_draw cursor;
 
 	struct ripple ripples[MAX_RIPPLES];
 	size_t nr_ripples;
@@ -134,6 +144,7 @@ void osx_mouse_hide();
 void osx_screen_get_dimensions(screen_t scr, int *w, int *h);
 void osx_screen_draw_box(screen_t scr, int x, int y, int w, int h,
 			 const char *color);
+int osx_screen_draw_cursor(screen_t scr, int x, int y);
 void osx_screen_clear(screen_t scr);
 void osx_screen_clear_ripples(screen_t scr);
 void osx_screen_list(screen_t scr[MAX_SCREENS], size_t *n);

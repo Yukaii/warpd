@@ -1,6 +1,7 @@
 #include "warpd.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -102,7 +103,11 @@ static struct {
     {"cursor_color", "#FF4500",
      "The color of the pointer in normal mode (rgba hex value).", OPT_STRING},
 
-    {"cursor_size", "7", "The height of the pointer in normal mode.", OPT_INT},
+    {"cursor_size", "7", "The height of pointer in normal mode.", OPT_INT},
+    {"cursor_pack", "none",
+     "Cursor pack name or path for custom cursor (macOS .cursor, normal mode).",
+     OPT_STRING},
+
     {"repeat_interval", "20",
      "The number of milliseconds before repeating a movement event.", OPT_INT},
     {"speed", "220", "Pointer speed in pixels/second.", OPT_INT},

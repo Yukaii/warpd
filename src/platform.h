@@ -85,6 +85,7 @@ struct platform {
 	void (*screen_get_dimensions)(screen_t scr, int *w, int *h);
 	void (*screen_draw_box)(screen_t scr, int x, int y, int w, int h,
 				const char *color);
+	int (*screen_draw_cursor)(screen_t scr, int x, int y);
 	void (*screen_clear_ripples)(screen_t scr);
 
 	void (*screen_clear)(screen_t scr);

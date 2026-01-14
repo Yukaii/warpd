@@ -42,9 +42,14 @@ static void redraw(screen_t scr, int x, int y, int hide_cursor,
 		}
 	}
 
-	if (!hide_cursor)
-		platform->screen_draw_box(scr, x + 1, y - cursz / 2, cursz,
-					  cursz, curcol);
+	if (!hide_cursor) {
+		int drawn = 0;
+		if (platform->screen_draw_cursor)
+			drawn = platform->screen_draw_cursor(scr, x, y);
+		if (!drawn)
+			platform->screen_draw_box(scr, x + 1, y - cursz / 2,
+						  cursz, cursz, curcol);
+	}
 
 	if (!strcmp(indicator, "bottomleft"))
 		platform->screen_draw_box(scr, gap, sh - indicator_size - gap,
