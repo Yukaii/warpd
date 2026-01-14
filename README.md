@@ -323,9 +323,18 @@ right: d
 hold_buttons: unbind
 # hold_buttons: m , .
 
-# Custom cursor (macOS cursor packs, uses warpd cursor)
+# Cursor appearance (macOS only)
+# Option 1: Use system cursor (default arrow)
+normal_system_cursor: 1
+
+# Option 2: Use custom cursor pack
 # cursor_pack: pointinghand
+# cursor_pack: openhand
 # cursor_pack: ~/Library/Cursors/MyCursor.cursor
+#
+# Available system cursors on macOS:
+# List all: ls /System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/HIServices.framework/Versions/A/Resources/cursors/
+# Examples: pointinghand, openhand, closedhand, cross, move, copy, notallowed, resizeeastwest, etc.
 
 # Rapid auto-click while rapid_mode is active
 rapid_mode: R
