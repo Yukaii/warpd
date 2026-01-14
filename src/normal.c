@@ -6,6 +6,20 @@
 
 #include "warpd.h"
 
+/* Check if using a non-default cursor (cursor pack or system cursor) */
+static int is_using_custom_cursor(void)
+{
+	const char *cursor_pack = config_get("cursor_pack");
+	int system_cursor = config_get_int("normal_system_cursor");
+
+	/* Non-default if cursor_pack is set OR system cursor is enabled */
+	if (system_cursor)
+		return 1;
+	if (cursor_pack && cursor_pack[0] && strcmp(cursor_pack, "none") != 0)
+		return 1;
+	return 0;
+}
+
 static void redraw(screen_t scr, int x, int y, int hide_cursor,
 		   int show_rapid_indicator)
 {
@@ -43,6 +57,10 @@ static void redraw(screen_t scr, int x, int y, int hide_cursor,
 	}
 
 	if (!hide_cursor) {
+		/* Draw halo behind cursor when using custom cursor */
+		if (is_using_custom_cursor() && platform->screen_draw_halo)
+			platform->screen_draw_halo(scr, x, y);
+
 		int drawn = 0;
 		if (platform->screen_draw_cursor)
 			drawn = platform->screen_draw_cursor(scr, x, y);
@@ -147,6 +165,11 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		platform->mouse_hide();
 
 	mouse_reset();
+
+	/* Trigger entry pulse when entering normal mode with custom cursor */
+	if (is_using_custom_cursor() && platform->trigger_entry_pulse)
+		platform->trigger_entry_pulse(scr, mx, my);
+
 	redraw(scr, mx, my, !show_cursor, rapid_mode);
 
 	uint64_t time = 0;
@@ -198,9 +221,12 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		}
 
 		if (!ev) {
-			// Force redraw if ripples are active (for animation)
-			if (platform->has_active_ripples &&
-			    platform->has_active_ripples(scr)) {
+			// Force redraw if animations are active
+			int has_ripples = platform->has_active_ripples &&
+					  platform->has_active_ripples(scr);
+			int has_entry_pulse = platform->has_active_entry_pulse &&
+					      platform->has_active_entry_pulse(scr);
+			if (has_ripples || has_entry_pulse) {
 				redraw(scr, mx, my, !show_cursor, rapid_mode);
 			}
 			continue;

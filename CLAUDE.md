@@ -156,7 +156,7 @@ Configuration is loaded from:
 - Scroll keys (e.g., `scroll_up: e`, `scroll_left: t`)
 - Appearance (e.g., `hint_font: Menlo-Regular`, `cursor_color: #cc0000`)
 - Physics (e.g., `max_speed: 1200`, `acceleration: 2900`)
-- Visual effects (e.g., `ripple_enabled: 1`, `ripple_max_radius: 50`)
+- Visual effects (e.g., `ripple_enabled: 1`, `cursor_halo_enabled: 1`, `cursor_entry_effect: 1`)
 
 ### Drawing and Overlay System (macOS)
 
@@ -255,6 +255,41 @@ Examples:
 - `#ff000080` - Semi-transparent red
 - `#00ff00ff` - Opaque green
 - `#0080ff40` - Very transparent blue
+
+Currently implemented only on macOS (X11/Wayland have NULL stubs).
+
+### Cursor Visual Effects (Halo and Entry Pulse)
+
+When using a non-default cursor (via `cursor_pack` or `normal_system_cursor`), additional visual effects can help users locate and track the cursor:
+
+**Cursor Halo**: A subtle semi-transparent circle behind the cursor that's always visible.
+
+**Entry Pulse**: A one-time expanding ring animation when entering normal mode (like a "cursor landed here" effect).
+
+**When Effects Apply**:
+Both effects only activate when using a non-default cursor:
+- `cursor_pack` is set to something other than "none", OR
+- `normal_system_cursor` is set to non-zero
+
+**Configuration**:
+```
+# Cursor Halo (static glow behind cursor)
+cursor_halo_enabled: 0          # Enable/disable halo (default: off)
+cursor_halo_color: #ffffff20    # RGBA hex (very subtle white glow)
+cursor_halo_radius: 20          # Radius in pixels
+
+# Entry Pulse (one-time animation on mode entry)
+cursor_entry_effect: 0          # Enable/disable entry pulse (default: off)
+cursor_entry_color: #00ff0060   # RGBA hex (semi-transparent green)
+cursor_entry_duration: 200      # Animation duration (ms)
+cursor_entry_radius: 40         # Maximum radius (pixels)
+```
+
+**Implementation Notes**:
+- Halo is drawn before the cursor in the rendering pipeline (appears behind)
+- Entry pulse reuses the same time-based animation logic as ripples
+- Both effects are registered as draw hooks during `osx_screen_clear()`
+- Entry pulse is triggered once via `platform->trigger_entry_pulse()` on mode entry
 
 Currently implemented only on macOS (X11/Wayland have NULL stubs).
 

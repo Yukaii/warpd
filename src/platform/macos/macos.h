@@ -55,6 +55,22 @@ struct cursor_draw {
 	struct screen *scr;
 };
 
+struct halo {
+	int x;
+	int y;
+	float radius;
+	NSColor *color;
+	struct screen *scr;
+};
+
+struct entry_pulse {
+	int x;
+	int y;
+	float radius;
+	uint64_t start_time;
+	int active;
+};
+
 size_t nr_boxes;
 
 struct drawing_hook {
@@ -84,6 +100,8 @@ struct screen {
 	size_t nr_boxes;
 
 	struct cursor_draw cursor;
+	struct halo halo;
+	struct entry_pulse entry_pulse;
 
 	struct ripple ripples[MAX_RIPPLES];
 	size_t nr_ripples;
@@ -150,6 +168,9 @@ void osx_screen_clear_ripples(screen_t scr);
 void osx_screen_list(screen_t scr[MAX_SCREENS], size_t *n);
 void osx_trigger_ripple(screen_t scr, int x, int y);
 int osx_has_active_ripples(screen_t scr);
+void osx_screen_draw_halo(screen_t scr, int x, int y);
+void osx_trigger_entry_pulse(screen_t scr, int x, int y);
+int osx_has_active_entry_pulse(screen_t scr);
 void osx_init_hint(const char *bg, const char *fg, int border_radius,
 		   const char *border_color, int border_width,
 		   const char *font_family);

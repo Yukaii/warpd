@@ -113,6 +113,11 @@ struct platform {
 	void (*trigger_ripple)(screen_t scr, int x, int y);
 	int (*has_active_ripples)(screen_t scr);
 
+	/* Cursor visual effects (for non-default cursor styles) */
+	void (*screen_draw_halo)(screen_t scr, int x, int y);
+	void (*trigger_entry_pulse)(screen_t scr, int x, int y);
+	int (*has_active_entry_pulse)(screen_t scr);
+
 	void (*copy_selection)();
 
 	/*

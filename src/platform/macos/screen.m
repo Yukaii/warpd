@@ -125,6 +125,60 @@ static int load_cursor_pack(const char *cursor_pack)
 	return cursor_image != nil;
 }
 
+static void halo_draw_hook(void *arg, NSView *view)
+{
+	struct halo *h = arg;
+	if (!h->color || h->radius <= 0)
+		return;
+
+	// Draw filled circle (halo) behind cursor
+	float x = h->x;
+	float y = h->scr->h - h->y;  // Convert ULO to LLO
+
+	NSBezierPath *path = [NSBezierPath bezierPath];
+	[path appendBezierPathWithOvalInRect:NSMakeRect(x - h->radius, y - h->radius,
+							h->radius * 2, h->radius * 2)];
+	[h->color setFill];
+	[path fill];
+}
+
+static void entry_pulse_draw_hook(void *arg, NSView *view)
+{
+	struct entry_pulse *ep = arg;
+	struct screen *scr = &screens[0];
+
+	// Find which screen this entry pulse belongs to
+	for (size_t i = 0; i < nr_screens; i++) {
+		if (&screens[i].entry_pulse == ep) {
+			scr = &screens[i];
+			break;
+		}
+	}
+
+	uint64_t now = get_time_us() / 1000;
+	uint64_t elapsed = now - ep->start_time;
+	int duration = config_get_int("cursor_entry_duration");
+
+	if (elapsed > duration) {
+		ep->active = 0;
+		return;
+	}
+
+	// Calculate current radius based on elapsed time
+	float progress = (float)elapsed / (float)duration;
+	float max_radius = (float)config_get_int("cursor_entry_radius");
+	ep->radius = progress * max_radius;
+
+	// Calculate alpha based on progress (fade out)
+	float alpha = 1.0 - progress;
+
+	NSColor *color = nscolor_from_hex(config_get("cursor_entry_color"));
+	NSColor *fadedColor = [color colorWithAlphaComponent:alpha];
+	float lineWidth = 2.0;  // Entry pulse uses fixed line width
+
+	macos_draw_circle(scr, fadedColor, (float)ep->x, (float)ep->y, ep->radius, lineWidth);
+}
+
 static void ripple_draw_hook(void *arg, NSView *view)
 {
 	struct ripple *r = arg;
@@ -224,6 +278,11 @@ void osx_screen_clear(struct screen *scr)
 			}
 		}
 	}
+
+	// Keep active entry pulse and register its draw hook
+	if (config_get_int("cursor_entry_effect") && scr->entry_pulse.active) {
+		window_register_draw_hook(scr->overlay, entry_pulse_draw_hook, &scr->entry_pulse);
+	}
 }
 
 void osx_screen_clear_ripples(struct screen *scr)
@@ -278,6 +337,41 @@ int osx_has_active_ripples(struct screen *scr)
 			return 1;
 	}
 	return 0;
+}
+
+void osx_screen_draw_halo(struct screen *scr, int x, int y)
+{
+	if (!config_get_int("cursor_halo_enabled"))
+		return;
+
+	scr->halo.scr = scr;
+	scr->halo.x = x;
+	scr->halo.y = y;
+	scr->halo.radius = (float)config_get_int("cursor_halo_radius");
+	scr->halo.color = nscolor_from_hex(config_get("cursor_halo_color"));
+
+	// Register halo draw hook (drawn before cursor so it appears behind)
+	window_register_draw_hook(scr->overlay, halo_draw_hook, &scr->halo);
+}
+
+void osx_trigger_entry_pulse(struct screen *scr, int x, int y)
+{
+	if (!config_get_int("cursor_entry_effect"))
+		return;
+
+	scr->entry_pulse.x = x;
+	scr->entry_pulse.y = y;
+	scr->entry_pulse.radius = 0;
+	scr->entry_pulse.start_time = get_time_us() / 1000;
+	scr->entry_pulse.active = 1;
+}
+
+int osx_has_active_entry_pulse(struct screen *scr)
+{
+	if (!config_get_int("cursor_entry_effect"))
+		return 0;
+
+	return scr->entry_pulse.active;
 }
 
 void macos_init_screen()

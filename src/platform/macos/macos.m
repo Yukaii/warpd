@@ -348,6 +348,9 @@ static void *mainloop(void *arg)
 		.key_tap = osx_key_tap,
 		.trigger_ripple = osx_trigger_ripple,
 		.has_active_ripples = osx_has_active_ripples,
+		.screen_draw_halo = osx_screen_draw_halo,
+		.trigger_entry_pulse = osx_trigger_entry_pulse,
+		.has_active_entry_pulse = osx_has_active_entry_pulse,
 		.monitor_file = osx_monitor_file,
 	};
 
