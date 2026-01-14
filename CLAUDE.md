@@ -293,6 +293,18 @@ Example:
 hold_buttons: m , .
 ```
 
+### Rapid Click (Auto-Click While Held)
+
+Press `rapid_mode` (default `R`) to toggle rapid clicking, then press a mouse button key to start auto-clicking. Press `rapid_mode` again or press `esc` to stop. Configure speed with `rapid_click_interval`, and the HUD with `rapid_indicator_color`/`rapid_indicator_width`.
+
+Example:
+```
+rapid_mode: R
+rapid_click_interval: 40
+rapid_indicator_color: #ff000080
+rapid_indicator_width: 3
+```
+
 ### Adding Platform Functions
 
 When adding new platform capabilities:

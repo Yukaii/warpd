@@ -6,7 +6,8 @@
 
 #include "warpd.h"
 
-static void redraw(screen_t scr, int x, int y, int hide_cursor)
+static void redraw(screen_t scr, int x, int y, int hide_cursor,
+		   int show_rapid_indicator)
 {
 	int sw, sh;
 
@@ -21,6 +22,25 @@ static void redraw(screen_t scr, int x, int y, int hide_cursor)
 	const int cursz = config_get_int("cursor_size");
 
 	platform->screen_clear(scr);
+
+	if (show_rapid_indicator) {
+		const int border_width =
+		    config_get_int("rapid_indicator_width");
+		const char *border_color = config_get("rapid_indicator_color");
+
+		if (border_width > 0 && border_width * 2 < sw &&
+		    border_width * 2 < sh) {
+			platform->screen_draw_box(scr, 0, 0, sw, border_width,
+						  border_color);
+			platform->screen_draw_box(scr, 0, sh - border_width, sw,
+						  border_width, border_color);
+			platform->screen_draw_box(scr, 0, 0, border_width, sh,
+						  border_color);
+			platform->screen_draw_box(scr, sw - border_width, 0,
+						  border_width, sh,
+						  border_color);
+		}
+	}
 
 	if (!hide_cursor)
 		platform->screen_draw_box(scr, x + 1, y - cursz / 2, cursz,
@@ -45,10 +65,11 @@ static void redraw(screen_t scr, int x, int y, int hide_cursor)
 	platform->commit();
 }
 
-static void move(screen_t scr, int x, int y, int hide_cursor)
+static void move(screen_t scr, int x, int y, int hide_cursor,
+		 int show_rapid_indicator)
 {
 	platform->mouse_move(scr, x, y);
-	redraw(scr, x, y, hide_cursor);
+	redraw(scr, x, y, hide_cursor, show_rapid_indicator);
 }
 
 struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
@@ -65,6 +86,9 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 	int dragging = 0;
 	int show_cursor = !system_cursor;
 	int held_buttons[8] = {0};
+	int rapid_mode = 0;
+	int rapid_button = 0;
+	uint64_t last_rapid_click = 0;
 
 	int n = sscanf(blink_interval, "%d %d", &on_time, &off_time);
 	assert(n > 0);
@@ -76,6 +100,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 	    "bottom",
 	    "buttons",
 	    "hold_buttons",
+	    "rapid_mode",
 	    "copy_and_exit",
 
 	    "decelerator",
@@ -117,7 +142,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		platform->mouse_hide();
 
 	mouse_reset();
-	redraw(scr, mx, my, !show_cursor);
+	redraw(scr, mx, my, !show_cursor, rapid_mode);
 
 	uint64_t time = 0;
 	uint64_t last_blink_update = 0;
@@ -137,31 +162,46 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			if (show_cursor &&
 			    (time - last_blink_update) >= on_time) {
 				show_cursor = 0;
-				redraw(scr, mx, my, !show_cursor);
+				redraw(scr, mx, my, !show_cursor, rapid_mode);
 				last_blink_update = time;
 			} else if (!show_cursor &&
 				   (time - last_blink_update) >= off_time) {
 				show_cursor = 1;
-				redraw(scr, mx, my, !show_cursor);
+				redraw(scr, mx, my, !show_cursor, rapid_mode);
 				last_blink_update = time;
 			}
 		}
 
 		scroll_tick();
 		if (mouse_process_key(ev, "up", "down", "left", "right")) {
-			redraw(scr, mx, my, !show_cursor);
+			redraw(scr, mx, my, !show_cursor, rapid_mode);
 			continue;
+		}
+
+		const int skip_rapid =
+		    ev && ev->pressed && config_input_match(ev, "exit");
+
+		if (rapid_mode && rapid_button && !skip_rapid) {
+			const int interval =
+			    config_get_int("rapid_click_interval");
+			if ((time - last_rapid_click) >= (uint64_t)interval) {
+				if (platform->trigger_ripple)
+					platform->trigger_ripple(scr, mx, my);
+				platform->mouse_click(rapid_button);
+				last_rapid_click = time;
+			}
 		}
 
 		if (!ev) {
 			// Force redraw if ripples are active (for animation)
 			if (platform->has_active_ripples &&
 			    platform->has_active_ripples(scr)) {
-				redraw(scr, mx, my, !show_cursor);
+				redraw(scr, mx, my, !show_cursor, rapid_mode);
 			}
 			continue;
 		} else if (config_input_match(ev, "scroll_down")) {
-			redraw(scr, mx, my, 1);
+
+			redraw(scr, mx, my, 1, rapid_mode);
 
 			if (ev->pressed) {
 				scroll_stop();
@@ -169,7 +209,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			} else
 				scroll_decelerate();
 		} else if (config_input_match(ev, "scroll_up")) {
-			redraw(scr, mx, my, 1);
+			redraw(scr, mx, my, 1, rapid_mode);
 
 			if (ev->pressed) {
 				scroll_stop();
@@ -177,7 +217,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			} else
 				scroll_decelerate();
 		} else if (config_input_match(ev, "scroll_left")) {
-			redraw(scr, mx, my, 1);
+			redraw(scr, mx, my, 1, rapid_mode);
 
 			if (ev->pressed) {
 				scroll_stop();
@@ -185,7 +225,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			} else
 				scroll_decelerate();
 		} else if (config_input_match(ev, "scroll_right")) {
-			redraw(scr, mx, my, 1);
+			redraw(scr, mx, my, 1, rapid_mode);
 
 			if (ev->pressed) {
 				scroll_stop();
@@ -197,7 +237,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				int amount =
 				    config_get_int("scroll_page_amount");
 				scroll_stop();
-				redraw(scr, mx, my, 1);
+				redraw(scr, mx, my, 1, rapid_mode);
 				platform->scroll_amount(SCROLL_DOWN, amount);
 			}
 		} else if (config_input_match(ev, "scroll_page_up")) {
@@ -205,7 +245,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				int amount =
 				    config_get_int("scroll_page_amount");
 				scroll_stop();
-				redraw(scr, mx, my, 1);
+				redraw(scr, mx, my, 1, rapid_mode);
 				platform->scroll_amount(SCROLL_UP, amount);
 			}
 		} else if (config_input_match(ev, "scroll_home")) {
@@ -213,7 +253,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				int amount =
 				    config_get_int("scroll_home_amount");
 				scroll_stop();
-				redraw(scr, mx, my, 1);
+				redraw(scr, mx, my, 1, rapid_mode);
 				platform->scroll_amount(SCROLL_UP, amount);
 			}
 		} else if (config_input_match(ev, "scroll_end")) {
@@ -221,7 +261,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				int amount =
 				    config_get_int("scroll_home_amount");
 				scroll_stop();
-				redraw(scr, mx, my, 1);
+				redraw(scr, mx, my, 1, rapid_mode);
 				platform->scroll_amount(SCROLL_DOWN, amount);
 			}
 		} else if (config_input_match(ev, "accelerator")) {
@@ -233,9 +273,35 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			mouse_slow();
 		}
 
+		if (config_input_match(ev, "rapid_mode") && ev->pressed) {
+			rapid_mode = !rapid_mode;
+			if (!rapid_mode)
+				rapid_button = 0;
+			redraw(scr, mx, my, !show_cursor, rapid_mode);
+			goto next;
+		}
+
+		if (rapid_mode && ev->pressed) {
+			int btn = config_input_match(ev, "buttons");
+			if (!btn)
+				btn = config_input_match(ev, "hold_buttons");
+			if (!btn)
+				btn = config_input_match(ev, "oneshot_buttons");
+			if (btn) {
+				rapid_button = btn;
+				if (platform->trigger_ripple)
+					platform->trigger_ripple(scr, mx, my);
+				platform->mouse_click(btn);
+				last_rapid_click = time;
+				goto next;
+			}
+		}
+
 		{
 			int btn = config_input_match(ev, "hold_buttons");
 			if (btn) {
+				if (rapid_mode)
+					goto next;
 				const int drag_button =
 				    config_get_int("drag_button");
 				if (dragging && btn == drag_button)
@@ -251,6 +317,10 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 					} else if (held_buttons[btn]) {
 						held_buttons[btn] = 0;
 						platform->mouse_up(btn);
+						if (platform->trigger_ripple)
+							platform
+							    ->trigger_ripple(
+								scr, mx, my);
 					}
 				}
 				goto next;
@@ -262,24 +332,24 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 		}
 
 		if (config_input_match(ev, "top")) {
-			move(scr, mx, cursz / 2, !show_cursor);
+			move(scr, mx, cursz / 2, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, mx, cursz / 2);
 		} else if (config_input_match(ev, "bottom")) {
-			move(scr, mx, sh - cursz / 2, !show_cursor);
+			move(scr, mx, sh - cursz / 2, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, mx,
 							 sh - cursz / 2);
 		} else if (config_input_match(ev, "middle")) {
-			move(scr, mx, sh / 2, !show_cursor);
+			move(scr, mx, sh / 2, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, mx, sh / 2);
 		} else if (config_input_match(ev, "start")) {
-			move(scr, 1, my, !show_cursor);
+			move(scr, 1, my, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, 1, my);
 		} else if (config_input_match(ev, "end")) {
-			move(scr, sw - cursz, my, !show_cursor);
+			move(scr, sw - cursz, my, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, sw - cursz, my);
 		} else if (config_input_match(ev, "hist_back")) {
@@ -287,14 +357,14 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			hist_prev();
 			hist_get(&mx, &my);
 
-			move(scr, mx, my, !show_cursor);
+			move(scr, mx, my, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, mx, my);
 		} else if (config_input_match(ev, "hist_forward")) {
 			hist_next();
 			hist_get(&mx, &my);
 
-			move(scr, mx, my, !show_cursor);
+			move(scr, mx, my, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, mx, my);
 		} else if (config_input_match(ev, "drag")) {
@@ -316,6 +386,8 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			   config_input_match(ev, "history") ||
 			   config_input_match(ev, "hint2") ||
 			   config_input_match(ev, "hint")) {
+			rapid_mode = 0;
+			rapid_button = 0;
 			goto exit;
 		} else if (config_input_match(ev, "print")) {
 			printf("%d %d %s\n", mx, my, input_event_tostr(ev));
@@ -368,8 +440,13 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 	}
 
 exit:
+	rapid_mode = 0;
+	rapid_button = 0;
+	if (platform->screen_clear_ripples)
+		platform->screen_clear_ripples(scr);
 	for (size_t i = 1; i < sizeof(held_buttons) / sizeof(held_buttons[0]);
 	     i++) {
+
 		if (held_buttons[i])
 			platform->mouse_up(i);
 	}

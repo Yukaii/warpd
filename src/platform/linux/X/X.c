@@ -194,10 +194,7 @@ Window create_window(const char *color)
 	return win;
 }
 
-void x_commit()
-{
-	XSync(dpy, False);
-}
+void x_commit() { XSync(dpy, False); }
 
 long x_get_mtime(const char *path)
 {
@@ -211,11 +208,12 @@ long x_get_mtime(const char *path)
 void x_monitor_file(const char *path)
 {
 	/*
-	 * OPT: We could use inotify, but that would reduce portability and involve
-	 * additional logic to handle renames. Polling is good enough.
+	 * OPT: We could use inotify, but that would reduce portability and
+	 * involve additional logic to handle renames. Polling is good enough.
 	 */
 	struct monitored_file *mf = &monitored_files[nr_monitored_files];
-	assert(nr_monitored_files < sizeof (monitored_files) / sizeof(monitored_files[0]));
+	assert(nr_monitored_files <
+	       sizeof(monitored_files) / sizeof(monitored_files[0]));
 
 	strncpy(mf->path, path, sizeof mf->path);
 	mf->mtime = x_get_mtime(path);
@@ -256,11 +254,12 @@ void x_init(struct platform *platform)
 	platform->mouse_show = x_mouse_show;
 	platform->mouse_up = x_mouse_up;
 	platform->screen_clear = x_screen_clear;
+	platform->screen_clear_ripples = NULL;
 	platform->screen_draw_box = x_screen_draw_box;
 	platform->screen_get_dimensions = x_screen_get_dimensions;
 	platform->screen_list = x_screen_list;
 	platform->scroll = x_scroll;
 	platform->scroll_amount = x_scroll_amount;
-	platform->trigger_ripple = NULL;  // TODO: Implement ripple for X11
-	platform->has_active_ripples = NULL;  // TODO: Implement ripple for X11
+	platform->trigger_ripple = NULL;     // TODO: Implement ripple for X11
+	platform->has_active_ripples = NULL; // TODO: Implement ripple for X11
 }

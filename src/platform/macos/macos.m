@@ -338,6 +338,7 @@ static void *mainloop(void *arg)
 		.mouse_show = osx_mouse_show,
 		.mouse_up = osx_mouse_up,
 		.screen_clear = osx_screen_clear,
+		.screen_clear_ripples = osx_screen_clear_ripples,
 		.screen_draw_box = osx_screen_draw_box,
 		.screen_get_dimensions = osx_screen_get_dimensions,
 		.screen_list = osx_screen_list,

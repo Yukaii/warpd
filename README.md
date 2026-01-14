@@ -254,6 +254,8 @@ A more comprehensive description can be found in the [man page](warpd.1.md) (alo
 | `v` | Toggle Drag Mode | Enter/exit visual (drag) mode |
 | `c` | Copy & Exit | Send copy command and exit |
 
+Press `rapid_mode` (default `R`) to toggle rapid clicks, then press a mouse button key to start auto-clicking. Press `rapid_mode` again or hit `esc` to stop. Use `rapid_click_interval` to control speed.
+
 ### Mode Switching (From Normal Mode)
 
 | Key | Action | Description |
@@ -320,6 +322,12 @@ right: d
 # Hold mouse buttons while key pressed
 hold_buttons: unbind
 # hold_buttons: m , .
+
+# Rapid auto-click while rapid_mode is active
+rapid_mode: R
+rapid_click_interval: 40
+rapid_indicator_color: #ff000080
+rapid_indicator_width: 3
 
 # Hint font (monospace recommended for distinguishing I/l/1)
 # macOS PostScript names: Menlo-Regular (default), Monaco, Courier

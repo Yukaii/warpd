@@ -141,7 +141,9 @@ objects until the drag key is hit again or a mouse button is pressed.
 Additionally, the *copy_and_exit* key (_c_) may be used to copy the selected
 text to the system clipboard and terminate the current session. Keys bound via
 *hold_buttons* will press the corresponding mouse button while held (unbound by
-default).
+default). Press *rapid_mode* (default `R`) to toggle rapid clicking, then press a
+mouse button key to start auto-clicking until *rapid_mode* is pressed again or
+*esc* is pressed. The interval is controlled by *rapid_click_interval*.
 
 ## Wayland
 

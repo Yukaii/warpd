@@ -93,6 +93,12 @@ void osx_screen_clear(struct screen *scr)
 	}
 }
 
+void osx_screen_clear_ripples(struct screen *scr)
+{
+	for (size_t i = 0; i < scr->nr_ripples; i++)
+		scr->ripples[i].active = 0;
+}
+
 void osx_trigger_ripple(struct screen *scr, int x, int y)
 {
 	if (!config_get_int("ripple_enabled"))

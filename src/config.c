@@ -46,6 +46,16 @@ static struct {
      OPT_BUTTON},
     {"hold_buttons", "unbind",
      "Mouse buttons to hold while the key is pressed.", OPT_BUTTON},
+    {"rapid_mode", "R", "Toggle rapid click mode (press a button to start).",
+     OPT_KEY},
+
+    {"rapid_click_interval", "40", "Milliseconds between rapid clicks.",
+     OPT_INT},
+    {"rapid_indicator_color", "#ff000080",
+     "Rapid mode border color (RGBA hex).", OPT_STRING},
+    {"rapid_indicator_width", "3", "Rapid mode border width in pixels.",
+     OPT_INT},
+
     {"drag_button", "1", "The mouse buttton used for dragging.", OPT_INT},
     {"oneshot_buttons", "n - /", "Oneshot mouse buttons (deactivate on click).",
      OPT_BUTTON},

@@ -605,6 +605,7 @@ void platform_run(int (*main)(struct platform *platform))
 	platform.input_next_event = input_next_event;
 	platform.input_wait = input_wait;
 	platform.screen_clear = screen_clear;
+	platform.screen_clear_ripples = NULL;
 
 	platform.screen_get_dimensions = screen_get_dimensions;
 	platform.screen_list = screen_list;

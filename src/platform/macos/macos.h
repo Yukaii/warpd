@@ -135,6 +135,7 @@ void osx_screen_get_dimensions(screen_t scr, int *w, int *h);
 void osx_screen_draw_box(screen_t scr, int x, int y, int w, int h,
 			 const char *color);
 void osx_screen_clear(screen_t scr);
+void osx_screen_clear_ripples(screen_t scr);
 void osx_screen_list(screen_t scr[MAX_SCREENS], size_t *n);
 void osx_trigger_ripple(screen_t scr, int x, int y);
 int osx_has_active_ripples(screen_t scr);
