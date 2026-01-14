@@ -322,6 +322,8 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 					} else if (held_buttons[btn]) {
 						held_buttons[btn] = 0;
 						platform->mouse_up(btn);
+						hist_add(mx, my);
+						histfile_add(mx, my);
 						if (platform->trigger_ripple)
 							platform
 							    ->trigger_ripple(
