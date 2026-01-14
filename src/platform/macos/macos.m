@@ -60,11 +60,28 @@ void macos_draw_box(struct screen *scr, NSColor *col, float x, float y, float w,
 
 	NSBezierPath *path = [NSBezierPath
 	    bezierPathWithRoundedRect:NSMakeRect((float)x, (float)y, (float)w,
-						 (float)h)
+					 (float)h)
 			      xRadius:(float)r
 			      yRadius:(float)r];
 	[path fill];
 }
+
+void macos_draw_box_outline(struct screen *scr, NSColor *col, float x, float y, float w, float h, float r, float line_width)
+{
+	[col setStroke];
+
+	/* Convert to LLO */
+	y = scr->h - y - h;
+
+	NSBezierPath *path = [NSBezierPath
+	    bezierPathWithRoundedRect:NSMakeRect((float)x, (float)y, (float)w,
+					 (float)h)
+			      xRadius:(float)r
+			      yRadius:(float)r];
+	[path setLineWidth:line_width];
+	[path stroke];
+}
+
 
 void macos_draw_circle(struct screen *scr, NSColor *col, float x, float y, float radius, float lineWidth)
 {

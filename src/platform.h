@@ -11,16 +11,16 @@
 #include <stdlib.h>
 
 #define PLATFORM_MOD_CONTROL 1
-#define PLATFORM_MOD_SHIFT 2
-#define PLATFORM_MOD_META 4
-#define PLATFORM_MOD_ALT 8
+#define PLATFORM_MOD_SHIFT   2
+#define PLATFORM_MOD_META    4
+#define PLATFORM_MOD_ALT     8
 
-#define SCROLL_DOWN 1
+#define SCROLL_DOWN  1
 #define SCROLL_RIGHT 2
-#define SCROLL_LEFT 3
-#define SCROLL_UP 4
+#define SCROLL_LEFT  3
+#define SCROLL_UP    4
 
-#define MAX_HINTS 2048
+#define MAX_HINTS   2048
 #define MAX_SCREENS 32
 
 struct input_event {
@@ -52,13 +52,16 @@ struct platform {
 	uint8_t (*input_lookup_code)(const char *name, int *shifted);
 	const char *(*input_lookup_name)(uint8_t code, int shifted);
 
-	/* Returns the QWERTY character for a keycode, independent of current layout */
+	/* Returns the QWERTY character for a keycode, independent of current
+	 * layout */
 	char (*input_code_to_qwerty)(uint8_t code);
 
-	/* Returns the keycode for a QWERTY character, independent of current layout */
+	/* Returns the keycode for a QWERTY character, independent of current
+	 * layout */
 	uint8_t (*input_qwerty_to_code)(char c);
 
-	/* Returns the keycode for special keys (esc, backspace, space, etc.), independent of layout */
+	/* Returns the keycode for special keys (esc, backspace, space, etc.),
+	 * independent of layout */
 	uint8_t (*input_special_to_code)(const char *name);
 
 	/*
@@ -66,7 +69,8 @@ struct platform {
 	 * grabbing the keyboard (including the event itself)
 	 * and returning the matched event.
 	 */
-	struct input_event *(*input_wait)(struct input_event *events, size_t sz);
+	struct input_event *(*input_wait)(struct input_event *events,
+					  size_t sz);
 
 	void (*mouse_move)(screen_t scr, int x, int y);
 	void (*mouse_down)(int btn);
@@ -79,13 +83,16 @@ struct platform {
 	void (*mouse_hide)();
 
 	void (*screen_get_dimensions)(screen_t scr, int *w, int *h);
-	void (*screen_draw_box)(screen_t scr, int x, int y, int w, int h, const char *color);
+	void (*screen_draw_box)(screen_t scr, int x, int y, int w, int h,
+				const char *color);
 	void (*screen_clear)(screen_t scr);
 	void (*screen_list)(screen_t scr[MAX_SCREENS], size_t *n);
 
-	void (*init_hint)(const char *bg, const char *fg, int border_radius, const char *font_family);
+	void (*init_hint)(const char *bg, const char *fg, int border_radius,
+			  const char *border_color, int border_width,
+			  const char *font_family);
 
-	/* 
+	/*
 	 * Modifications to files passed into this function will interrupt
 	 * input_wait (which returns NULL).
 	 */
@@ -102,11 +109,11 @@ struct platform {
 	void (*copy_selection)();
 
 	/*
-	* Draw operations may (or may not) be queued until this function
-	* is called.
-	*/
+	 * Draw operations may (or may not) be queued until this function
+	 * is called.
+	 */
 	void (*commit)();
 };
 
-void platform_run(int (*main) (struct platform *platform));
+void platform_run(int (*main)(struct platform *platform));
 #endif

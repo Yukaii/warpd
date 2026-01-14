@@ -326,6 +326,8 @@ hint_bgcolor: #1c1c1e
 hint_fgcolor: #a1aba7
 hint_size: 20
 hint_border_radius: 3
+hint_border_color: #ffffff
+hint_border_width: 0
 
 # Ripple effect (visual feedback on clicks and jumps)
 ripple_enabled: 1

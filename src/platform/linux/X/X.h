@@ -22,13 +22,13 @@
 #include <X11/keysym.h>
 #include <assert.h>
 #include <ctype.h>
+#include <libgen.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <libgen.h>
 
 #define MAX_BOXES 64
 
@@ -68,7 +68,7 @@ struct monitored_file {
 Window create_window(const char *color);
 
 int hex_to_rgba(const char *str, uint8_t *r, uint8_t *g, uint8_t *b,
-		     uint8_t *a);
+		uint8_t *a);
 uint32_t parse_xcolor(const char *s, uint8_t *opacity);
 void init_xscreens();
 
@@ -98,10 +98,13 @@ void x_mouse_get_position(screen_t *scr, int *x, int *y);
 void x_mouse_show();
 void x_mouse_hide();
 void x_screen_get_dimensions(screen_t scr, int *w, int *h);
-void x_screen_draw_box(screen_t scr, int x, int y, int w, int h, const char *color);
+void x_screen_draw_box(screen_t scr, int x, int y, int w, int h,
+		       const char *color);
 void x_screen_clear(screen_t scr);
 void x_screen_list(screen_t scr[MAX_SCREENS], size_t *n);
-void x_init_hint(const char *bg, const char *fg, int border_radius, const char *font_family);
+void x_init_hint(const char *bg, const char *fg, int border_radius,
+		 const char *border_color, int border_width,
+		 const char *font_family);
 void x_hint_draw(struct screen *scr, struct hint *hints, size_t n);
 void x_scroll(int direction);
 void x_scroll_amount(int direction, int amount);

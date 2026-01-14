@@ -9,10 +9,10 @@
 
 #include "../../platform.h"
 #include <ApplicationServices/ApplicationServices.h>
-#include <Cocoa/Cocoa.h>
 #include <Carbon/Carbon.h>
-#include <stdint.h>
+#include <Cocoa/Cocoa.h>
 #include <pthread.h>
+#include <stdint.h>
 
 /*
  * NOTE: our API uses an upper left origin (ULO) coordinate system, while
@@ -26,8 +26,8 @@
  */
 
 #define MAX_DRAWING_HOOKS 32
-#define MAX_BOXES 32
-#define MAX_RIPPLES 10
+#define MAX_BOXES	  32
+#define MAX_RIPPLES	  10
 
 struct ripple {
 	int x;
@@ -79,9 +79,7 @@ struct screen {
 	size_t nr_ripples;
 
 	struct window *overlay;
-
 };
-
 
 void window_show(struct window *win);
 void window_hide(struct window *win);
@@ -100,8 +98,11 @@ void macos_init_screen();
 
 void macos_draw_box(struct screen *scr, NSColor *col, float x, float y, float w,
 		    float h, float r);
+void macos_draw_box_outline(struct screen *scr, NSColor *col, float x, float y,
+			    float w, float h, float r, float line_width);
 
-void macos_draw_circle(struct screen *scr, NSColor *col, float x, float y, float radius, float lineWidth);
+void macos_draw_circle(struct screen *scr, NSColor *col, float x, float y,
+		       float radius, float lineWidth);
 
 void macos_draw_text(struct screen *scr, NSColor *col, const char *font, int x,
 		     int y, int w, int h, const char *s);
@@ -131,12 +132,15 @@ void osx_mouse_get_position(screen_t *scr, int *x, int *y);
 void osx_mouse_show();
 void osx_mouse_hide();
 void osx_screen_get_dimensions(screen_t scr, int *w, int *h);
-void osx_screen_draw_box(screen_t scr, int x, int y, int w, int h, const char *color);
+void osx_screen_draw_box(screen_t scr, int x, int y, int w, int h,
+			 const char *color);
 void osx_screen_clear(screen_t scr);
 void osx_screen_list(screen_t scr[MAX_SCREENS], size_t *n);
 void osx_trigger_ripple(screen_t scr, int x, int y);
 int osx_has_active_ripples(screen_t scr);
-void osx_init_hint(const char *bg, const char *fg, int border_radius, const char *font_family);
+void osx_init_hint(const char *bg, const char *fg, int border_radius,
+		   const char *border_color, int border_width,
+		   const char *font_family);
 void osx_hint_draw(struct screen *scr, struct hint *hints, size_t n);
 void osx_scroll(int direction);
 void osx_copy_selection();

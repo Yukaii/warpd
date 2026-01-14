@@ -7,9 +7,11 @@
 #include "X.h"
 
 static int border_radius;
+static int border_width;
 static const char *font_family;
 static const char *fgcolor;
 static const char *bgcolor;
+static const char *border_color;
 
 static XftColor parse_xft_color(const char *s)
 {
@@ -40,8 +42,7 @@ static XftFont *get_font(const char *name, int height)
 	char xftname[256];
 	int h;
 
-	if (!strcmp(cached_name, name) &&
-		    cached_height == height)
+	if (!strcmp(cached_name, name) && cached_height == height)
 		return font;
 
 	strcpy(cached_name, name);
@@ -79,10 +80,9 @@ static int draw_text(Drawable drw, int x, int y, int w, int h,
 	font_height = font->ascent + font->descent;
 
 	x += (w - e.width) / 2;
-	y += (h-font_height) / 2 + font->ascent;
+	y += (h - font_height) / 2 + font->ascent;
 
-	XftDrawStringUtf8(xftdrw, &col, font, x, y, (FcChar8 *)s,
-			  strlen(s));
+	XftDrawStringUtf8(xftdrw, &col, font, x, y, (FcChar8 *)s, strlen(s));
 
 	return 0;
 }
@@ -105,18 +105,32 @@ static void draw_rounded_rectangle(Drawable drw, GC gc, unsigned int x,
 }
 
 /* Draw the hints. */
-void do_hint_draw(struct screen *scr, Window win, struct hint *hints, size_t n, Pixmap buf)
+void do_hint_draw(struct screen *scr, Window win, struct hint *hints, size_t n,
+		  Pixmap buf)
 {
 	size_t i = 0;
 
 	Pixmap mask = XCreatePixmap(dpy, win, scr->w, scr->h, 1);
 	GC gc = XCreateGC(dpy, mask, 0, NULL);
-	GC mgc = XCreateGC(dpy, DefaultRootWindow(dpy),
-			   GCForeground | GCFillStyle,
-			   &(XGCValues){
-			   .foreground = parse_xcolor(bgcolor, NULL),
-			   .fill_style = FillSolid,
-			   });
+	GC mgc =
+	    XCreateGC(dpy, DefaultRootWindow(dpy), GCForeground | GCFillStyle,
+		      &(XGCValues){
+			  .foreground = parse_xcolor(bgcolor, NULL),
+			  .fill_style = FillSolid,
+		      });
+	GC border_gc = 0;
+	if (border_width > 0) {
+		border_gc = XCreateGC(
+		    dpy, DefaultRootWindow(dpy),
+		    GCForeground | GCLineWidth | GCFillStyle,
+		    &(XGCValues){
+			.foreground = parse_xcolor(border_color, NULL),
+			.line_width = border_width,
+			.fill_style = FillSolid,
+		    });
+		XSetLineAttributes(dpy, border_gc, border_width, LineSolid,
+				   CapButt, JoinMiter);
+	}
 
 	XSetForeground(dpy, gc, 0);
 	XFillRectangle(dpy, mask, gc, 0, 0, scr->w, scr->h);
@@ -129,9 +143,11 @@ void do_hint_draw(struct screen *scr, Window win, struct hint *hints, size_t n, 
 
 		draw_rounded_rectangle(mask, gc, h->x, h->y, h->w, h->h,
 				       border_radius);
+		if (border_gc)
+			XDrawRectangle(dpy, buf, border_gc, h->x, h->y, h->w,
+				       h->h);
 
-		draw_text(buf, h->x, h->y,
-			  h->w, h->h, font_family, h->label);
+		draw_text(buf, h->x, h->y, h->w, h->h, font_family, h->label);
 	}
 
 	/* Expensive for large masks. */
@@ -144,6 +160,8 @@ void do_hint_draw(struct screen *scr, Window win, struct hint *hints, size_t n, 
 	XFreePixmap(dpy, mask);
 	XFreeGC(dpy, gc);
 	XFreeGC(dpy, mgc);
+	if (border_gc)
+		XFreeGC(dpy, border_gc);
 }
 
 void x_hint_draw(struct screen *scr, struct hint *hints, size_t n)
@@ -158,15 +176,15 @@ void x_hint_draw(struct screen *scr, struct hint *hints, size_t n)
 	if (n == scr->nr_cached_hints &&
 	    !memcmp(scr->cached_hints, hints, sizeof(struct hint) * n)) {
 		GC gc = XCreateGC(dpy, DefaultRootWindow(dpy),
-				   GCForeground | GCFillStyle,
-				   &(XGCValues){
-				   .foreground = parse_xcolor(bgcolor, NULL),
-				   .fill_style = FillSolid,
-				   });
+				  GCForeground | GCFillStyle,
+				  &(XGCValues){
+				      .foreground = parse_xcolor(bgcolor, NULL),
+				      .fill_style = FillSolid,
+				  });
 
 		XMoveWindow(dpy, scr->cached_hintwin, scr->x, scr->y);
-		XCopyArea(dpy, scr->cached_hintbuf, scr->cached_hintwin,
-			  gc, 0, 0, scr->w, scr->h, 0, 0);
+		XCopyArea(dpy, scr->cached_hintbuf, scr->cached_hintwin, gc, 0,
+			  0, scr->w, scr->h, 0, 0);
 		XRaiseWindow(dpy, scr->cached_hintwin);
 
 		XFreeGC(dpy, gc);
@@ -185,15 +203,15 @@ void x_hint_draw(struct screen *scr, struct hint *hints, size_t n)
 		win = scr->cached_hintwin;
 		buf = scr->cached_hintbuf;
 
-		memcpy(scr->cached_hints, hints, n*sizeof(struct hint));
+		memcpy(scr->cached_hints, hints, n * sizeof(struct hint));
 		scr->nr_cached_hints = n;
 	}
-
 
 	do_hint_draw(scr, win, hints, n, buf);
 }
 
 void x_init_hint(const char *bgcol, const char *fgcol, int _border_radius,
+		 const char *border_col, int _border_width,
 		 const char *_font_family)
 {
 	static int init = 0;
@@ -202,8 +220,9 @@ void x_init_hint(const char *bgcol, const char *fgcol, int _border_radius,
 	bgcolor = bgcol;
 	fgcolor = fgcol;
 	border_radius = _border_radius;
+	border_color = border_col;
+	border_width = _border_width;
 	font_family = _font_family;
-
 
 	if (!init) {
 		for (i = 0; i < nr_xscreens; i++) {
@@ -212,16 +231,17 @@ void x_init_hint(const char *bgcol, const char *fgcol, int _border_radius,
 			scr->hintwin = create_window(bgcol);
 			scr->cached_hintwin = create_window(bgcol);
 
-			scr->buf =
-			    XCreatePixmap(dpy, DefaultRootWindow(dpy), scr->w, scr->h,
-					  DefaultDepth(dpy, DefaultScreen(dpy)));
-			scr->cached_hintbuf =
-			    XCreatePixmap(dpy, DefaultRootWindow(dpy), scr->w, scr->h,
-					  DefaultDepth(dpy, DefaultScreen(dpy)));
+			scr->buf = XCreatePixmap(
+			    dpy, DefaultRootWindow(dpy), scr->w, scr->h,
+			    DefaultDepth(dpy, DefaultScreen(dpy)));
+			scr->cached_hintbuf = XCreatePixmap(
+			    dpy, DefaultRootWindow(dpy), scr->w, scr->h,
+			    DefaultDepth(dpy, DefaultScreen(dpy)));
 
-
-			XMoveResizeWindow(dpy, scr->hintwin, -1E6, -1E6, scr->w, scr->h);
-			XMoveResizeWindow(dpy, scr->cached_hintwin, -1E6, -1E6, scr->w, scr->h);
+			XMoveResizeWindow(dpy, scr->hintwin, -1E6, -1E6, scr->w,
+					  scr->h);
+			XMoveResizeWindow(dpy, scr->cached_hintwin, -1E6, -1E6,
+					  scr->w, scr->h);
 
 			XMapWindow(dpy, scr->hintwin);
 			XMapWindow(dpy, scr->cached_hintwin);

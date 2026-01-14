@@ -1,7 +1,8 @@
 #include "windows.h"
 
-#define TRANSPARENT_COLOR RGB(0,0,1)
-#define AcquireMutex(mtx) assert(WaitForSingleObject(mtx, INFINITE) == WAIT_OBJECT_0)
+#define TRANSPARENT_COLOR RGB(0, 0, 1)
+#define AcquireMutex(mtx)                                                      \
+	assert(WaitForSingleObject(mtx, INFINITE) == WAIT_OBJECT_0)
 
 static DWORD ui_thread_id;
 static HANDLE mtx;
@@ -17,7 +18,7 @@ struct screen {
 	int y;
 	int w;
 	int h;
-	
+
 	struct hint hints[4096];
 	struct box boxes[128];
 
@@ -31,6 +32,8 @@ struct screen {
 
 static COLORREF hint_bgcol;
 static COLORREF hint_fgcol;
+static COLORREF hint_border_col;
+static int hint_border_width;
 
 static struct screen screens[16];
 static size_t nscreens = 0;
@@ -40,12 +43,13 @@ static void draw_hints(struct screen *scr)
 	size_t i;
 
 	HBRUSH bgbrush = CreateSolidBrush(hint_bgcol);
+	HBRUSH border_brush =
+	    hint_border_width > 0 ? CreateSolidBrush(hint_border_col) : NULL;
 
 	SetBkColor(scr->dc, hint_bgcol);
 	SetTextColor(scr->dc, hint_fgcol);
 
-
-	//TODO: font should fill the box.
+	// TODO: font should fill the box.
 
 	for (i = 0; i < scr->nhints; i++) {
 		RECT rect;
@@ -54,18 +58,29 @@ static void draw_hints(struct screen *scr)
 
 		rect.left = h->x;
 		rect.top = h->y;
-		rect.right = h->x+h->w;
-		rect.bottom = h->y+h->h;
+		rect.right = h->x + h->w;
+		rect.bottom = h->y + h->h;
 
 		FillRect(scr->dc, &rect, bgbrush);
-		//FIXME
-		//mbstowcs (label, h->label, sizeof label / sizeof label[0] - 1);
-		//label[sizeof label / sizeof label[0] - 1] = 0;
+		if (border_brush) {
+			for (int offset = 0; offset < hint_border_width;
+			     offset++) {
+				RECT border_rect = rect;
+				InflateRect(&border_rect, -offset, -offset);
+				FrameRect(scr->dc, &border_rect, border_brush);
+			}
+		}
+		// FIXME
+		// mbstowcs (label, h->label, sizeof label / sizeof label[0] -
+		// 1); label[sizeof label / sizeof label[0] - 1] = 0;
 
-		DrawText(scr->dc, h->label, -1, &rect, DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+		DrawText(scr->dc, h->label, -1, &rect,
+			 DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 	}
 
 	DeleteObject(bgbrush);
+	if (border_brush)
+		DeleteObject(border_brush);
 }
 
 static void clear(struct screen *scr)
@@ -78,12 +93,11 @@ static void clear(struct screen *scr)
 
 	rect.left = scr->x;
 	rect.top = scr->y;
-	rect.right = scr->x+scr->w;
-	rect.bottom = scr->y+scr->h;
+	rect.right = scr->x + scr->w;
+	rect.bottom = scr->y + scr->h;
 
-	FillRect(scr->dc,  &rect, br);
+	FillRect(scr->dc, &rect, br);
 }
-
 
 static void redraw(struct screen *scr)
 {
@@ -92,7 +106,8 @@ static void redraw(struct screen *scr)
 	clear(scr);
 
 	for (i = 0; i < scr->nboxes; i++) {
-		HBRUSH brush = CreateSolidBrush(scr->boxes[i].color); //TODO: optimize
+		HBRUSH brush =
+		    CreateSolidBrush(scr->boxes[i].color); // TODO: optimize
 		FillRect(scr->dc, &scr->boxes[i].rect, brush);
 		DeleteObject(brush);
 	}
@@ -100,7 +115,8 @@ static void redraw(struct screen *scr)
 	draw_hints(scr);
 }
 
-LRESULT CALLBACK OverlayRedrawProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK OverlayRedrawProc(HWND hWnd, UINT Msg, WPARAM wParam,
+				   LPARAM lParam)
 {
 	if (Msg == WM_PAINT) {
 		size_t i;
@@ -130,7 +146,8 @@ static HWND create_overlay(int x, int y, int w, int h)
 		RegisterClass(&wc);
 	}
 
-	HWND wnd = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_TOPMOST |
+	HWND wnd = CreateWindowEx(WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW |
+				      WS_EX_TOPMOST |
 				      WS_EX_LAYERED, // Optional window styles.
 				  CLASS_NAME,	     // Window class
 				  "",		     // Window text
@@ -151,31 +168,31 @@ static HWND create_overlay(int x, int y, int w, int h)
 	return wnd;
 }
 
-static BOOL CALLBACK screenCallback(HMONITOR mon, HDC hdc, LPRECT dim, LPARAM lParam)
+static BOOL CALLBACK screenCallback(HMONITOR mon, HDC hdc, LPRECT dim,
+				    LPARAM lParam)
 {
-AcquireMutex(mtx);
+	AcquireMutex(mtx);
 
-    assert(nscreens < sizeof screens / sizeof screens[0]);
+	assert(nscreens < sizeof screens / sizeof screens[0]);
 
-    struct screen *scr = &screens[nscreens++];
+	struct screen *scr = &screens[nscreens++];
 
-    scr->x = dim->top;
-    scr->y = dim->left;
-    scr->h = dim->bottom - dim->top;
-    scr->w = dim->right - dim->left;
+	scr->x = dim->top;
+	scr->y = dim->left;
+	scr->h = dim->bottom - dim->top;
+	scr->w = dim->right - dim->left;
 
-    scr->nboxes = 0;
-    scr->nhints = 0;
+	scr->nboxes = 0;
+	scr->nhints = 0;
 
-    scr->overlay = create_overlay(scr->x, scr->y, scr->w, scr->h);
-    scr->dc = GetDC(scr->overlay);
+	scr->overlay = create_overlay(scr->x, scr->y, scr->w, scr->h);
+	scr->dc = GetDC(scr->overlay);
 
+	ShowWindow(scr->overlay, SW_SHOW);
 
-    ShowWindow(scr->overlay, SW_SHOW);
+	ReleaseMutex(mtx);
 
-ReleaseMutex(mtx);
-
-    return TRUE;
+	return TRUE;
 }
 
 /* Main draw loop. */
@@ -188,14 +205,14 @@ static DWORD WINAPI uithread(void *arg)
 		MSG msg;
 		GetMessage(&msg, 0, 0, 0);
 
-AcquireMutex(mtx);
+		AcquireMutex(mtx);
 
 		DispatchMessage(&msg);
 
 		if (msg.message == WM_USER)
 			redraw((struct screen *)msg.lParam);
 
-ReleaseMutex(mtx);
+		ReleaseMutex(mtx);
 	}
 }
 
@@ -208,26 +225,32 @@ void wn_screen_redraw(struct screen *scr)
 
 void wn_screen_set_hints(struct screen *scr, struct hint *hints, size_t nhints)
 {
-AcquireMutex(mtx);
+	AcquireMutex(mtx);
 
 	assert(nhints < sizeof scr->hints / sizeof scr->hints[0]);
 	memcpy(scr->hints, hints, sizeof(struct hint) * nhints);
 	scr->nhints = nhints;
 
-ReleaseMutex(mtx);
+	ReleaseMutex(mtx);
 }
 
-void wn_screen_get_dimensions(struct screen *scr, int *xoff, int *yoff, int *w, int *h)
+void wn_screen_get_dimensions(struct screen *scr, int *xoff, int *yoff, int *w,
+			      int *h)
 {
-	if (xoff) *xoff = scr->x;
-	if (yoff) *yoff = scr->y;
-	if (w) *w = scr->w;
-	if (h) *h = scr->h;
+	if (xoff)
+		*xoff = scr->x;
+	if (yoff)
+		*yoff = scr->y;
+	if (w)
+		*w = scr->w;
+	if (h)
+		*h = scr->h;
 }
 
-void wn_screen_add_box(struct screen *scr, int x, int y, int w, int h, COLORREF color)
+void wn_screen_add_box(struct screen *scr, int x, int y, int w, int h,
+		       COLORREF color)
 {
-AcquireMutex(mtx);
+	AcquireMutex(mtx);
 
 	assert(scr->nboxes < sizeof scr->boxes / sizeof scr->boxes[0]);
 
@@ -241,23 +264,26 @@ AcquireMutex(mtx);
 	box->color = color;
 	scr->nboxes++;
 
-ReleaseMutex(mtx);
+	ReleaseMutex(mtx);
 }
 
 void wn_screen_clear(struct screen *scr)
 {
-AcquireMutex(mtx);
+	AcquireMutex(mtx);
 
 	scr->nboxes = 0;
 	scr->nhints = 0;
 
-ReleaseMutex(mtx);
+	ReleaseMutex(mtx);
 }
 
-void wn_screen_set_hintinfo(COLORREF _hint_bgcol, COLORREF _hint_fgcol)
+void wn_screen_set_hintinfo(COLORREF _hint_bgcol, COLORREF _hint_fgcol,
+			    COLORREF _hint_border_col, int _hint_border_width)
 {
 	hint_bgcol = _hint_bgcol;
 	hint_fgcol = _hint_fgcol;
+	hint_border_col = _hint_border_col;
+	hint_border_width = _hint_border_width;
 }
 
 void wn_init_screen()
@@ -265,7 +291,7 @@ void wn_init_screen()
 	mtx = CreateMutex(0, 0, NULL);
 
 	CreateThread(0, 0, uithread, 0, 0, &ui_thread_id);
-	Sleep(200); //FIXME
+	Sleep(200); // FIXME
 }
 
 struct screen *wn_get_screen_at(int x, int y)
@@ -273,10 +299,8 @@ struct screen *wn_get_screen_at(int x, int y)
 	size_t i;
 
 	for (i = 0; i < nscreens; i++) {
-		if (
-			x >= screens[i].x && x <= screens[i].x + screens[i].w &&
-			y >= screens[i].y && y <= screens[i].y + screens[i].h
-		)
+		if (x >= screens[i].x && x <= screens[i].x + screens[i].w &&
+		    y >= screens[i].y && y <= screens[i].y + screens[i].h)
 			return &screens[i];
 	}
 
