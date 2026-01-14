@@ -284,6 +284,15 @@ To add new keybindings:
    }
    ```
 
+### Hold Buttons (Mouse Down While Held)
+
+Use the `hold_buttons` config option to bind keys that hold mouse buttons while pressed (default is unbound). These behave like press-and-hold for left/middle/right clicks and are released on key-up or when the mode exits.
+
+Example:
+```
+hold_buttons: m , .
+```
+
 ### Adding Platform Functions
 
 When adding new platform capabilities:
