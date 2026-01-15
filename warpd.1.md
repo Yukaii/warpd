@@ -24,6 +24,8 @@ Mode Flags:
 
 	*--hint*: Run warpd in (daemonless) hint mode.
 
+	*--find*: Run warpd in find mode (interactable hints, macOS only).
+
 	*--hint2*: Run warpd in 2 stage hint mode.
 
 	*--grid*: Run warpd in grid mode.
@@ -48,10 +50,10 @@ Mode Flags:
 
 # DESCRIPTION
 
-warpd has three main modes which can be used to manipulate the pointer. The
+warpd has four main modes which can be used to manipulate the pointer. The
 primary mode is called 'normal mode' (A-M-c) and facilitates local pointer
-movement using vi-like bindings (_h_ _j_ _k_ _l_). The other two modes, *hint*
-and *grid* mode are used to effect larger movements across the screen and are
+movement using vi-like bindings (_h_ _j_ _k_ _l_). The other modes, *hint*,
+*find*, and *grid* are used to effect larger movements across the screen and are
 expected to be used in combination with normal mode to achieve the desired end.
 
 For example, the user might activate warpd in hint mode (_A-M-x_) to pinpoint
@@ -95,6 +97,12 @@ provide contextual awareness, while enough hints must be present to facilitate
 targetting UI elements without the need for too much adjustment. Once this
 equilibrium has been achieved, using hint mode become second nature and is (in
 the author's opinion) superior to grid mode for quickly pinpointing elements.
+
+## Find Mode (A-M-f or 'f' within normal mode)
+
+Find mode limits hints to interactable elements like buttons, links, and labels
+using the macOS Accessibility API. It behaves like hint mode once a target is
+selected, but may be unavailable if accessibility permissions are not granted.
 
 For finer movements, a two phase hint mode can be activated by pressing 'X'
 within normal mode.

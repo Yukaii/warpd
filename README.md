@@ -162,9 +162,13 @@ launchctl unload /Library/LaunchAgents/com.warpd.warpd.plist
 1. Run `warpd`
 
 ## Hint Mode
-2. Press `A-M-x` (`alt+meta+x`) to generate a list of hints
+2. Press `A-M-x` (`alt+meta+x`) to generate a full-screen list of hints
 3. Enter the key sequence associated with the desired target to warp the pointer to that location and enter normal mode.
 4. Use the normal mode movement keys to select the final desination (see Normal Mode).
+
+## Find Mode (macOS)
+2. Press `A-M-f` (`alt+meta+f`) to show hints over interactable elements
+3. Enter the key sequence to warp the pointer to that element and enter normal mode.
 
 ## Grid Mode
 2. Press `A-M-g` (meta is the command key) to activate the warping process.
@@ -190,7 +194,8 @@ A more comprehensive description can be found in the [man page](warpd.1.md) (alo
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| `Alt-Cmd-x` | Hint Mode | Generate hints for clickable elements |
+| `Alt-Cmd-x` | Hint Mode | Generate full-screen hints |
+| `Alt-Cmd-f` | Find Mode | Hint interactable elements (macOS) |
 | `Alt-Cmd-X` | Hint Mode (2-pass) | Two-step hint selection for more targets |
 | `Alt-Cmd-l` | Hint Mode (oneshot) | Hint mode that exits after selection |
 | `Alt-Cmd-L` | Hint Mode 2 (oneshot) | Two-pass hint mode that exits after selection |
@@ -235,8 +240,8 @@ A more comprehensive description can be found in the [man page](warpd.1.md) (alo
 
 | Key | Action | Description |
 |-----|--------|-------------|
-| `f` | Page Down | Instant scroll down one page (800 units) |
-| `b` | Page Up | Instant scroll up one page (800 units) |
+| `C-f` | Page Down | Instant scroll down one page (800 units) |
+| `C-b` | Page Up | Instant scroll up one page (800 units) |
 | `z` | Home/Top | Instant scroll to top (100000 units) |
 | `Z` | End/Bottom | Instant scroll to bottom (100000 units) |
 
@@ -264,6 +269,7 @@ Press `rapid_mode` (default `R`) to toggle rapid clicks, then press a mouse butt
 |-----|--------|-------------|
 | `x` | Hint Mode | Switch to hint mode |
 | `X` | Hint Mode (2-pass) | Switch to two-pass hint mode |
+| `f` | Find Mode | Switch to interactable hints (macOS) |
 | `g` | Grid Mode | Switch to grid mode |
 | `s` | Screen Selection | Select different screen |
 | `;` | History Mode | Show hint history |

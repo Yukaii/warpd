@@ -175,6 +175,8 @@ void osx_init_hint(const char *bg, const char *fg, int border_radius,
 		   const char *border_color, int border_width,
 		   const char *font_family);
 void osx_hint_draw(struct screen *scr, struct hint *hints, size_t n);
+size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
+				      size_t max_hints);
 void osx_scroll(int direction);
 void osx_key_tap(uint8_t code, uint8_t mods);
 void osx_copy_selection();

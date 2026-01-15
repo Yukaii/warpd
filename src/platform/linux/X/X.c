@@ -236,6 +236,7 @@ void x_init(struct platform *platform)
 	platform->commit = x_commit;
 	platform->copy_selection = x_copy_selection;
 	platform->hint_draw = x_hint_draw;
+	platform->collect_interactable_hints = NULL;
 	platform->init_hint = x_init_hint;
 	platform->input_grab_keyboard = x_input_grab_keyboard;
 	platform->input_lookup_code = x_input_lookup_code;

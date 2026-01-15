@@ -45,6 +45,42 @@ static void get_hint_size(screen_t scr, int *w, int *h)
 	*h = (sh * config_get_int("hint_size")) / 1000;
 }
 
+static int hint_label_length(size_t count, size_t alphabet_len)
+{
+	int length = 1;
+	size_t capacity = alphabet_len;
+
+	if (alphabet_len == 0)
+		return 0;
+
+	while (capacity < count && length < (int)(sizeof(hints[0].label) - 1)) {
+		length++;
+		capacity *= alphabet_len;
+	}
+
+	return length;
+}
+
+static void generate_hint_labels(struct hint *out_hints, size_t count,
+				 const char *alphabet)
+{
+	size_t alphabet_len = strlen(alphabet);
+	int label_len = hint_label_length(count, alphabet_len);
+
+	if (!label_len)
+		return;
+
+	for (size_t i = 0; i < count; i++) {
+		size_t value = i;
+		for (int pos = label_len - 1; pos >= 0; pos--) {
+			out_hints[i].label[pos] =
+			    alphabet[value % alphabet_len];
+			value /= alphabet_len;
+		}
+		out_hints[i].label[label_len] = 0;
+	}
+}
+
 static size_t generate_fullscreen_hints(screen_t scr, struct hint *hints)
 {
 	int sw, sh;
@@ -289,6 +325,47 @@ int full_hint_mode(int second_pass)
 		return sift();
 	else
 		return 0;
+}
+
+int find_hint_mode()
+{
+	int w, h;
+	int sw, sh;
+	size_t n = 0;
+	screen_t scr;
+	struct hint hints[MAX_HINTS];
+
+	if (!platform->collect_interactable_hints)
+		return -1;
+
+	platform->mouse_get_position(&scr, NULL, NULL);
+	platform->screen_get_dimensions(scr, &sw, &sh);
+	get_hint_size(scr, &w, &h);
+
+	n = platform->collect_interactable_hints(scr, hints, MAX_HINTS);
+	if (!n)
+		return -1;
+
+	for (size_t i = 0; i < n; i++) {
+		int max_x = sw - w;
+		int max_y = sh - h;
+		int x = hints[i].x - w / 2;
+		int y = hints[i].y - h / 2;
+
+		if (max_x < 0)
+			max_x = 0;
+		if (max_y < 0)
+			max_y = 0;
+
+		hints[i].w = w;
+		hints[i].h = h;
+		hints[i].x = MIN(max_x, x < 0 ? 0 : x);
+		hints[i].y = MIN(max_y, y < 0 ? 0 : y);
+	}
+
+	generate_hint_labels(hints, n, config_get("hint_chars"));
+
+	return hint_selection(scr, hints, n);
 }
 
 int history_hint_mode()

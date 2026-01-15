@@ -16,6 +16,8 @@ static struct {
 	enum option_type type;
 } options[] = {
     {"hint_activation_key", "A-M-x", "Activates hint mode.", OPT_KEY},
+    {"find_activation_key", "A-M-f", "Activate find mode (interactable hints).",
+     OPT_KEY},
     {"hint2_activation_key", "A-M-X", "Activate two pass hint mode.", OPT_KEY},
     {"grid_activation_key", "A-M-g",
      "Activates grid mode and allows for further manipulation of the pointer "
@@ -70,6 +72,7 @@ static struct {
      "Activate hint mode while in normal mode (mnemonic: x marks the spot?).",
      OPT_KEY},
     {"hint2", "X", "Activate two pass hint mode.", OPT_KEY},
+    {"find", "f", "Activate find mode for interactable hints.", OPT_KEY},
     {"grid", "g", "Activate (g)rid mode while in normal mode.", OPT_KEY},
     {"screen", "s", "Activate (s)creen selection while in normal mode.",
      OPT_KEY},
@@ -95,8 +98,8 @@ static struct {
     {"scroll_up", "r", "Scroll up key.", OPT_KEY},
     {"scroll_left", "t", "Scroll left key.", OPT_KEY},
     {"scroll_right", "y", "Scroll right key.", OPT_KEY},
-    {"scroll_page_down", "f", "Scroll down one page.", OPT_KEY},
-    {"scroll_page_up", "b", "Scroll up one page.", OPT_KEY},
+    {"scroll_page_down", "C-f", "Scroll down one page.", OPT_KEY},
+    {"scroll_page_up", "C-b", "Scroll up one page.", OPT_KEY},
     {"scroll_home", "z", "Scroll to top of page.", OPT_KEY},
     {"scroll_end", "Z", "Scroll to bottom of page.", OPT_KEY},
 

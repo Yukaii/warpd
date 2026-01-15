@@ -5,6 +5,7 @@
  */
 
 #include "macos.h"
+#include <math.h>
 
 static NSDictionary *get_font_attrs(const char *family, NSColor *color, int h)
 {
@@ -248,6 +249,237 @@ void osx_copy_selection()
 	send_key(9, 0);   /* 'c' up */
 }
 
+static int ax_get_bool_attr(AXUIElementRef element, CFStringRef attr, int *value)
+{
+	CFTypeRef raw = NULL;
+	AXError error = AXUIElementCopyAttributeValue(element, attr, &raw);
+
+	if (error != kAXErrorSuccess || !raw)
+		return 0;
+
+	if (CFGetTypeID(raw) == CFBooleanGetTypeID()) {
+		*value = CFBooleanGetValue((CFBooleanRef)raw);
+		CFRelease(raw);
+		return 1;
+	}
+
+	CFRelease(raw);
+	return 0;
+}
+
+static CFStringRef ax_link_role(void)
+{
+#ifdef kAXLinkRole
+	return kAXLinkRole;
+#else
+	return CFSTR("AXLink");
+#endif
+}
+
+static int ax_role_matches(CFStringRef role)
+{
+	return CFEqual(role, kAXButtonRole) ||
+	       CFEqual(role, kAXCheckBoxRole) ||
+	       CFEqual(role, kAXRadioButtonRole) ||
+	       CFEqual(role, kAXPopUpButtonRole) ||
+	       CFEqual(role, ax_link_role()) ||
+	       CFEqual(role, kAXTextFieldRole) ||
+	       CFEqual(role, kAXTextAreaRole) ||
+	       CFEqual(role, kAXStaticTextRole);
+}
+
+static int ax_element_is_interactable(AXUIElementRef element)
+{
+	CFTypeRef role = NULL;
+	int enabled = 1;
+	int hidden = 0;
+
+	if (AXUIElementCopyAttributeValue(element, kAXRoleAttribute, &role) !=
+		    kAXErrorSuccess ||
+	    !role) {
+		return 0;
+	}
+
+	int matches = ax_role_matches((CFStringRef)role);
+	CFRelease(role);
+
+	if (!matches)
+		return 0;
+
+	if (ax_get_bool_attr(element, kAXEnabledAttribute, &enabled) && !enabled)
+		return 0;
+
+	if (ax_get_bool_attr(element, kAXHiddenAttribute, &hidden) && hidden)
+		return 0;
+
+	return 1;
+}
+
+static int ax_get_position_size(AXUIElementRef element, CGPoint *position,
+					CGSize *size)
+{
+	AXValueRef position_value = NULL;
+	AXValueRef size_value = NULL;
+
+	if (AXUIElementCopyAttributeValue(element, kAXPositionAttribute,
+				      (CFTypeRef *)&position_value) != kAXErrorSuccess ||
+	    !position_value)
+		return 0;
+
+	if (!AXValueGetValue(position_value, kAXValueCGPointType, position)) {
+		CFRelease(position_value);
+		return 0;
+	}
+
+	CFRelease(position_value);
+
+	if (AXUIElementCopyAttributeValue(element, kAXSizeAttribute,
+				      (CFTypeRef *)&size_value) != kAXErrorSuccess ||
+	    !size_value)
+		return 0;
+
+	if (!AXValueGetValue(size_value, kAXValueCGSizeType, size)) {
+		CFRelease(size_value);
+		return 0;
+	}
+
+	CFRelease(size_value);
+	return 1;
+}
+
+static int ax_element_center_for_screen(AXUIElementRef element, struct screen *scr,
+					const CGRect *window_frame,
+					int *center_x, int *center_y)
+{
+	CGPoint position = CGPointZero;
+	CGSize size = CGSizeZero;
+	float local_x;
+	float local_y;
+
+	if (!ax_get_position_size(element, &position, &size))
+		return 0;
+
+	if (size.width <= 0 || size.height <= 0)
+		return 0;
+
+	float global_x = position.x + size.width / 2.0f;
+	float global_y = position.y + size.height / 2.0f;
+
+	if (window_frame) {
+		if (global_x < window_frame->origin.x ||
+		    global_x > (window_frame->origin.x + window_frame->size.width) ||
+		    global_y < window_frame->origin.y ||
+		    global_y > (window_frame->origin.y + window_frame->size.height))
+			return 0;
+	}
+
+	if (global_x < scr->x || global_x > (scr->x + scr->w) ||
+	    global_y < scr->y || global_y > (scr->y + scr->h))
+		return 0;
+
+	local_x = global_x - scr->x;
+	local_y = global_y - scr->y;
+
+	*center_x = (int)lroundf(local_x);
+	*center_y = (int)lroundf(local_y);
+	return 1;
+}
+
+static void collect_interactable_hints(AXUIElementRef element, struct screen *scr,
+					const CGRect *window_frame,
+					struct hint *hints,
+					size_t max_hints, size_t *count)
+{
+	if (*count >= max_hints)
+		return;
+
+	if (ax_element_is_interactable(element)) {
+		int x;
+		int y;
+
+		if (ax_element_center_for_screen(element, scr, window_frame, &x, &y)) {
+			hints[*count].x = x;
+			hints[*count].y = y;
+			(*count)++;
+			if (*count >= max_hints)
+				return;
+		}
+	}
+
+	CFArrayRef children = NULL;
+	if (AXUIElementCopyAttributeValue(element, kAXChildrenAttribute,
+					 (CFTypeRef *)&children) == kAXErrorSuccess && children) {
+		CFIndex child_count = CFArrayGetCount(children);
+		for (CFIndex i = 0; i < child_count && *count < max_hints; i++) {
+			AXUIElementRef child =
+			    (AXUIElementRef)CFArrayGetValueAtIndex(children, i);
+			collect_interactable_hints(child, scr, window_frame,
+						  hints, max_hints, count);
+		}
+		CFRelease(children);
+	}
+}
+
+size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
+				      size_t max_hints)
+{
+	if (!AXIsProcessTrusted())
+		return 0;
+
+	AXUIElementRef focused_app = get_focused_app();
+	if (!focused_app)
+		return 0;
+
+	size_t count = 0;
+	AXUIElementRef focused_window = NULL;
+	AXError error = AXUIElementCopyAttributeValue(
+		focused_app, kAXFocusedWindowAttribute, (CFTypeRef *)&focused_window);
+
+	if (error == kAXErrorSuccess && focused_window) {
+		CGRect window_frame = CGRectZero;
+		CGPoint position = CGPointZero;
+		CGSize size = CGSizeZero;
+		const CGRect *frame_ptr = NULL;
+
+		if (ax_get_position_size(focused_window, &position, &size)) {
+			window_frame = CGRectMake(position.x, position.y, size.width, size.height);
+			frame_ptr = &window_frame;
+		}
+
+		collect_interactable_hints(focused_window, scr, frame_ptr,
+					  hints, max_hints, &count);
+		CFRelease(focused_window);
+	} else {
+		CFArrayRef windows = NULL;
+		error = AXUIElementCopyAttributeValue(
+			focused_app, kAXWindowsAttribute, (CFTypeRef *)&windows);
+		if (error == kAXErrorSuccess && windows) {
+			CFIndex window_count = CFArrayGetCount(windows);
+			for (CFIndex i = 0; i < window_count && count < max_hints; i++) {
+				AXUIElementRef window =
+				    (AXUIElementRef)CFArrayGetValueAtIndex(windows, i);
+				CGRect window_frame = CGRectZero;
+				CGPoint position = CGPointZero;
+				CGSize size = CGSizeZero;
+				const CGRect *frame_ptr = NULL;
+
+				if (ax_get_position_size(window, &position, &size)) {
+					window_frame = CGRectMake(position.x, position.y,
+								 size.width, size.height);
+					frame_ptr = &window_frame;
+				}
+
+				collect_interactable_hints(window, scr, frame_ptr,
+							  hints, max_hints, &count);
+			}
+			CFRelease(windows);
+		}
+	}
+
+	CFRelease(focused_app);
+	return count;
+}
+
 void osx_scroll(int direction)
 {
 	int y = 0;
@@ -320,6 +552,7 @@ static void *mainloop(void *arg)
 		.commit = osx_commit,
 		.copy_selection = osx_copy_selection,
 		.hint_draw = osx_hint_draw,
+		.collect_interactable_hints = osx_collect_interactable_hints,
 		.init_hint = osx_init_hint,
 		.input_grab_keyboard = osx_input_grab_keyboard,
 		.input_lookup_code = osx_input_lookup_code,

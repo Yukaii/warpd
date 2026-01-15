@@ -30,18 +30,28 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 				mode = MODE_HINT;
 			else if (config_input_match(ev, "hint2"))
 				mode = MODE_HINT2;
+			else if (config_input_match(ev, "find"))
+				mode = MODE_FIND;
 			else if (config_input_match(ev, "grid"))
 				mode = MODE_GRID;
 			else if (config_input_match(ev, "screen"))
 				mode = MODE_SCREEN_SELECTION;
-			else if ((rc = config_input_match(ev, "oneshot_buttons")) || !ev) {
+			else if ((rc = config_input_match(ev,
+							  "oneshot_buttons")) ||
+				 !ev) {
 				goto exit;
-			}
-			else if (config_input_match(ev, "exit") || !ev) {
+			} else if (config_input_match(ev, "exit") || !ev) {
 				rc = 0;
 				goto exit;
 			}
 
+			break;
+		case MODE_FIND:
+			if (find_hint_mode() < 0)
+				goto exit;
+
+			ev = NULL;
+			mode = MODE_NORMAL;
 			break;
 		case MODE_HINT2:
 		case MODE_HINT:
@@ -64,14 +74,16 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 			break;
 		}
 
-		if (oneshot && (initial_mode != MODE_NORMAL || (btn = config_input_match(ev, "buttons")))) {
+		if (oneshot && (initial_mode != MODE_NORMAL ||
+				(btn = config_input_match(ev, "buttons")))) {
 			int x, y;
 			screen_t scr;
 
 			platform->mouse_get_position(&scr, NULL, NULL);
 			platform->mouse_get_position(NULL, &x, &y);
 
-			if (platform->trigger_ripple) platform->trigger_ripple(scr, x, y);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, x, y);
 
 			if (record_history)
 				histfile_add(x, y);
@@ -88,4 +100,3 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 exit:
 	return rc;
 }
-

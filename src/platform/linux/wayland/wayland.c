@@ -314,6 +314,7 @@ void wayland_init(struct platform *platform)
 	platform->commit = way_commit;
 	platform->copy_selection = way_copy_selection;
 	platform->hint_draw = way_hint_draw;
+	platform->collect_interactable_hints = NULL;
 	platform->init_hint = way_init_hint;
 	platform->input_grab_keyboard = way_input_grab_keyboard;
 	platform->input_lookup_code = way_input_lookup_code;

@@ -601,6 +601,7 @@ void platform_run(int (*main)(struct platform *platform))
 
 	platform.init_hint = init_hint;
 	platform.hint_draw = hint_draw;
+	platform.collect_interactable_hints = NULL;
 	platform.screen_draw_box = screen_draw_box;
 	platform.screen_draw_cursor = NULL;
 	platform.input_next_event = input_next_event;

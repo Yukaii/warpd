@@ -104,6 +104,10 @@ struct platform {
 	/* Hints are centered around the provided x,y coordinates. */
 	void (*hint_draw)(struct screen *scr, struct hint *hints, size_t n);
 
+	/* Populate hints with center points for interactable elements. */
+	size_t (*collect_interactable_hints)(screen_t scr, struct hint *hints,
+					     size_t max_hints);
+
 	void (*scroll)(int direction);
 	void (*scroll_amount)(int direction, int amount);
 
