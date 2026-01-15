@@ -43,6 +43,22 @@ static uint64_t monotonic_time_ns()
 	return (now * timebase.numer) / timebase.denom;
 }
 
+static CGEventFlags get_active_mod_flags()
+{
+	CGEventFlags mask = 0;
+
+	if (active_mods & PLATFORM_MOD_META)
+		mask |= kCGEventFlagMaskCommand;
+	if (active_mods & PLATFORM_MOD_ALT)
+		mask |= kCGEventFlagMaskAlternate;
+	if (active_mods & PLATFORM_MOD_CONTROL)
+		mask |= kCGEventFlagMaskControl;
+	if (active_mods & PLATFORM_MOD_SHIFT)
+		mask |= kCGEventFlagMaskShift;
+
+	return mask;
+}
+
 static void do_mouse_click(int btn, int pressed, int nclicks)
 {
 	CGEventRef ev = CGEventCreate(NULL);
@@ -52,7 +68,7 @@ static void do_mouse_click(int btn, int pressed, int nclicks)
 	int down = kCGEventLeftMouseDown;
 	int up = kCGEventLeftMouseUp;
 	int button = kCGMouseButtonLeft;
-	CGEventFlags mask = 0;
+	CGEventFlags mask = get_active_mod_flags();
 
 	switch (btn) {
 	case 3:
@@ -72,10 +88,6 @@ static void do_mouse_click(int btn, int pressed, int nclicks)
 		break;
 	}
 
-	if (active_mods & PLATFORM_MOD_META) mask |= kCGEventFlagMaskCommand;
-	if (active_mods & PLATFORM_MOD_ALT) mask |= kCGEventFlagMaskAlternate;
-	if (active_mods & PLATFORM_MOD_CONTROL) mask |= kCGEventFlagMaskControl;
-	if (active_mods & PLATFORM_MOD_SHIFT) mask |= kCGEventFlagMaskShift;
 
 	if (pressed) {
 		ev = CGEventCreateMouseEvent(NULL, down, current_pos, button);
@@ -309,6 +321,7 @@ void osx_mouse_move(struct screen *scr, int x, int y)
 
 	CGEventRef ev = CGEventCreateMouseEvent(source, type, target, 0);
 
+	CGEventSetFlags(ev, get_active_mod_flags());
 	CGEventSetIntegerValueField(ev, kCGMouseEventDeltaX, delta_x);
 	CGEventSetIntegerValueField(ev, kCGMouseEventDeltaY, delta_y);
 	CGEventSetTimestamp(ev, timestamp);
@@ -319,6 +332,7 @@ void osx_mouse_move(struct screen *scr, int x, int y)
 	for (int i = 0; i < 3; i++) {
 		CGEventRef settle =
 		    CGEventCreateMouseEvent(source, type, target, 0);
+		CGEventSetFlags(settle, get_active_mod_flags());
 		CGEventSetIntegerValueField(settle, kCGMouseEventDeltaX, 0);
 		CGEventSetIntegerValueField(settle, kCGMouseEventDeltaY, 0);
 		CGEventSetTimestamp(settle, timestamp + 1000 + (i * 1000));

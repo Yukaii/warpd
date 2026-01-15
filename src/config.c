@@ -113,8 +113,8 @@ static struct {
      OPT_INT},
     {"cursor_halo_color", "#ffffff20",
      "Color of the cursor halo (RGBA hex, last 2 digits = alpha).", OPT_STRING},
-    {"cursor_halo_radius", "20",
-     "Radius of the cursor halo in pixels.", OPT_INT},
+    {"cursor_halo_radius", "20", "Radius of the cursor halo in pixels.",
+     OPT_INT},
 
     {"cursor_entry_effect", "0",
      "Enable a pulse effect when entering normal mode with non-default cursor.",
@@ -394,22 +394,62 @@ void parse_config(const char *path)
 	}
 }
 
+static int token_has_mods(const char *tok)
+{
+	while (tok[1] == '-') {
+		switch (tok[0]) {
+		case 'A':
+		case 'C':
+		case 'M':
+		case 'S':
+			return 1;
+		default:
+			return 0;
+		}
+
+		tok += 2;
+	}
+
+	return 0;
+}
+
 static int keyidx(const char *key_list, struct input_event *ev, int *exact)
 {
 	const char *tok;
 	char buf[1024];
 	int idx = 1;
+	int fallback = 0;
+
+	*exact = 0;
 
 	snprintf(buf, sizeof buf, "%s", key_list);
 
 	for (tok = strtok(buf, " "); tok; tok = strtok(NULL, " ")) {
-		int ret;
-		if ((ret = input_eq(ev, tok))) {
-			*exact = ret == 2;
+		int ret = input_eq(ev, tok);
+		if (!ret) {
+			idx++;
+			continue;
+		}
+
+		if (ret == 1 && token_has_mods(tok)) {
+			idx++;
+			continue;
+		}
+
+		if (ret == 2) {
+			*exact = 1;
 			return idx;
 		}
 
+		if (!fallback)
+			fallback = idx;
+
 		idx++;
+	}
+
+	if (fallback) {
+		*exact = 0;
+		return fallback;
 	}
 
 	return 0;

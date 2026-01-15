@@ -183,6 +183,8 @@ Options which take one or more keys may optionally be unset using the value
 
 - Options which accept multiple keys (e.g _buttons_) expect each key to be separated by a space.
 
+- Mouse button options (_buttons_, _oneshot_buttons_, _hold_buttons_) accept modifier prefixes (e.g _M-m_ for Cmd+left click). Use multiple declarations if you want both modified and unmodified bindings for the same mouse button.
+
 - For options expecting only a single key, it is possible to specify all desired bindings as space separated values in a single declaration.
 
 - If a key is bound to multiple config options, the most recently defined one takes precedence.

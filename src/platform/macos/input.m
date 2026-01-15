@@ -80,6 +80,7 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type,
 {
 	size_t i;
 	int is_key_event = 0;
+	int is_modifier_event = 0;
 
 	uint8_t code = 0;
 	uint8_t pressed = 0;
@@ -117,6 +118,7 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type,
 		code = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) + 1;
 		flags = CGEventGetFlags(event);
 		pressed = 0;
+		is_modifier_event = 1;
 
 		switch (code) {
 			case 57: case 61: pressed = !!(flags & kCGEventFlagMaskShift); break;
@@ -197,7 +199,7 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type,
 			return nil;
 		}
 
-	if (grabbed) {
+	if (grabbed && !is_modifier_event) {
 		/* If the keydown occurred before the grab, allow the keyup to pass through. */
 		if (pressed || pressed_timestamps[code] > grabbed_time) {
 			return nil;
