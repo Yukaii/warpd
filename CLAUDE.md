@@ -459,6 +459,16 @@ sudo tccutil reset Accessibility
 # Re-add bin/warpd to accessibility settings
 ```
 
+### Edge-Push for macOS Dock/Menu Bar
+
+macOS auto-hiding Dock and menu bar require "edge-push" events - continued mouse movement beyond the screen boundary - to trigger visibility. warpd handles this by:
+
+1. In `mouse.c:tick()`, calculating the "intended" unclamped position
+2. Sending mouse events with coordinates beyond the screen edge
+3. Clamping the internal cursor state afterward to stay sane
+
+This allows pressing `j` at the bottom of the screen to reveal an auto-hidden Dock, just like a real trackpad gesture. (Currently implemented on macOS only.)
+
 ### Common Pitfalls
 
 1. **Coordinate system confusion**: Always convert ULO ↔ LLO at the lowest level (draw functions)
