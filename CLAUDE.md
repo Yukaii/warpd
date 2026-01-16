@@ -403,6 +403,105 @@ The fork uses macOS Accessibility API in two cases:
    - `get_focused_app()` helper retrieves current focused app
    - Used to determine when to apply Kitty-specific workarounds
 
+3. **Find Mode Hint Collection** (`src/platform/macos/macos.m:osx_collect_interactable_hints()`):
+   - Traverses the accessibility tree to find clickable elements
+   - Uses multiple child attributes: `kAXChildrenAttribute`, `AXVisibleChildren`, `AXChildrenInNavigationOrder`
+   - Filters elements by role (AXButton, AXLink, AXTextField, etc.) and supported actions
+   - Deduplicates hints by position (5-pixel tolerance)
+
+### Browser Accessibility Limitations (Find Mode)
+
+**Chrome/Chromium** has significant accessibility limitations on macOS:
+
+- **Requires explicit activation**: Chrome doesn't fully enable its accessibility tree by default. It waits for an assistive technology (like VoiceOver) to be detected before populating the tree.
+- **AXEnhancedUserInterface**: Chrome looks for this attribute on its window to trigger full accessibility support. Tools can programmatically set `AXEnhancedUserInterface = true` on Chrome's AX element to enable it.
+- **Viewport-only exposure**: Even when enabled, Chrome only exposes elements currently visible in the viewport - this is an intentional performance optimization.
+- **Off-screen content missing**: Search result links, article links, and content below the fold are NOT exposed to the accessibility API.
+
+**Enabling Chrome Accessibility**:
+```bash
+# Option 1: Command-line flag
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --force-renderer-accessibility
+
+# Option 2: Chrome settings
+# Navigate to chrome://accessibility and enable for all pages
+
+# Option 3: Programmatic (what warpd should do)
+# Set AXEnhancedUserInterface attribute on Chrome's AX element
+```
+
+**Firefox** (version 87+, March 2021):
+- Full macOS accessibility support after Mozilla's 2020-2021 rebuild
+- Exposes complete page content including off-screen elements (like Safari)
+- No special activation needed - accessibility is enabled by default
+- Check `about:config` → `accessibility.force_disabled` is 0 (default)
+
+**Safari** works correctly:
+- Exposes full page content including off-screen elements
+- All clickable links are available to find mode
+- Recommended browser for full find mode functionality
+
+**Browser Comparison for Find Mode**:
+| Browser | Activation Required | Off-screen Content | Recommendation |
+|---------|--------------------|--------------------|----------------|
+| Safari  | None               | ✅ Full            | Best choice    |
+| Firefox | None (87+)         | ✅ Full            | Good choice    |
+| Chrome  | AXEnhancedUserInterface | ❌ Viewport only | Limited support |
+
+**Browser Tabs Are NOT Accessible**:
+Browser tabs (the clickable tab headers) are NOT exposed via the macOS Accessibility API:
+- **Safari**: Exposes `AXTabGroup` but it contains the entire window content, not individual tab elements
+- **Chrome**: Doesn't expose the tab bar at all via accessibility
+- **Both**: Control tabs via keyboard shortcuts (Cmd+Shift+[ and Cmd+Shift+]), not clickable elements
+
+This is a fundamental browser design decision. Screen readers navigate tabs using keyboard shortcuts, not by clicking on tab elements. Warpd cannot provide hints for browser tabs because they simply aren't exposed as accessibility elements.
+
+**Electron Apps**:
+Electron apps require `AXManualAccessibility = true` attribute to expose their accessibility tree. Warpd automatically sets this for known Electron apps (VS Code, Discord, Slack, Spotify, Figma, Notion, Linear, Obsidian).
+
+**Research Keywords**:
+- `AXEnhancedUserInterface` - attribute to enable Chrome/Chromium accessibility
+- `AXManualAccessibility` - attribute to enable Electron app accessibility
+- `AXTabs` - accessibility attribute for window tabs (not used by browsers)
+- `AXTabGroup` - accessibility role for tab containers
+- `--force-renderer-accessibility` - Chrome command-line flag
+- `chrome://accessibility` - Chrome's accessibility settings page
+- `accessibility.force_disabled` - Firefox about:config preference
+- `NSAccessibility` / `AXUIElement` - macOS accessibility framework
+
+**Debugging Find Mode**:
+```bash
+# Enable file-based debug logging
+env WARPD_AX_DEBUG=1 ./bin/warpd
+
+# Enable verbose logging (logs ALL elements, not just interactable)
+env WARPD_AX_DEBUG_VERBOSE=1 ./bin/warpd
+
+# Dump the raw AX tree (limited depth/node budget)
+env WARPD_AX_DUMP=1 ./bin/warpd
+
+# Optional: override dump depth/node budget
+# env WARPD_AX_DUMP=1 WARPD_AX_DEBUG_DEPTH=12 WARPD_AX_DEBUG_NODES=800 ./bin/warpd
+
+# Check the log
+cat /tmp/warpd_ax_debug.log
+
+# Useful analysis commands
+grep -c '^\[HINT\]' /tmp/warpd_ax_debug.log    # Count unique hints
+grep -c '^\[DUP\]' /tmp/warpd_ax_debug.log     # Count duplicates skipped
+grep 'role=AXLink' /tmp/warpd_ax_debug.log     # Show all links found
+```
+
+**Log markers**:
+- `[HINT]` - Element added as hint
+- `[DUP]` - Duplicate position skipped
+- `[OFFSCREEN]` - Element outside visible screen bounds
+- `[VISIT]` - Element traversed (verbose mode only)
+- `[SKIP]` - Element ignored by heuristics (verbose only)
+- `[MENU]` / `[MENU_DUP]` - Menu bar elements
+- `[MENU_OFFSCREEN]` - Menu element outside screen bounds
+- `[DUMP]` - AX tree dump sections (WARPD_AX_DUMP)
+
 ### macOS Key Emulation
 
 The `platform->key_tap(code, mods)` function emits synthetic keyboard events:
