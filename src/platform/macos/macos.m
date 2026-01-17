@@ -11,6 +11,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+#include <float.h>
+#include <unistd.h>
 
 /* Declare get_time_us from warpd.c - avoid including warpd.h to prevent conflicts */
 extern uint64_t get_time_us(void);
@@ -464,6 +467,140 @@ static CFStringRef ax_menu_bar_attribute(void)
 #endif
 }
 
+static CFStringRef ax_menu_attribute(void)
+{
+#ifdef kAXMenuAttribute
+	return kAXMenuAttribute;
+#else
+	return CFSTR("AXMenu");
+#endif
+}
+
+static CFStringRef ax_menu_role(void)
+{
+#ifdef kAXMenuRole
+	return kAXMenuRole;
+#else
+	return CFSTR("AXMenu");
+#endif
+}
+
+static CFStringRef ax_menu_bar_item_role(void)
+{
+#ifdef kAXMenuBarItemRole
+	return kAXMenuBarItemRole;
+#else
+	return CFSTR("AXMenuBarItem");
+#endif
+}
+
+static CFStringRef ax_menu_bar_role(void)
+{
+#ifdef kAXMenuBarRole
+	return kAXMenuBarRole;
+#else
+	return CFSTR("AXMenuBar");
+#endif
+}
+
+static int ax_copy_string_attr(AXUIElementRef element, CFStringRef attr,
+			      char *out, size_t out_len);
+
+static int ax_menu_bar_item_title(AXUIElementRef element, char *out, size_t out_len)
+{
+	CFTypeRef role = NULL;
+	int is_menu_bar_item = 0;
+
+	if (!element || !out || out_len == 0)
+		return 0;
+
+	out[0] = 0;
+	if (AXUIElementCopyAttributeValue(element, kAXRoleAttribute, &role) ==
+		    kAXErrorSuccess && role) {
+		if (CFGetTypeID(role) == CFStringGetTypeID())
+			is_menu_bar_item =
+				CFEqual((CFStringRef)role, ax_menu_bar_item_role());
+		CFRelease(role);
+	}
+
+	if (!is_menu_bar_item)
+		return 0;
+
+	if (ax_copy_string_attr(element, kAXTitleAttribute, out, out_len))
+		return 1;
+
+	if (ax_copy_string_attr(element, kAXValueAttribute, out, out_len))
+		return 1;
+
+	return 0;
+}
+
+static int ax_menu_root_matches_title(AXUIElementRef menu_root, const char *title)
+{
+	char root_title[256];
+
+	if (!menu_root || !title || !title[0])
+		return 1;
+
+	if (!ax_copy_string_attr(menu_root, kAXTitleAttribute,
+				 root_title, sizeof root_title))
+		return 1;
+
+	if (strcmp(root_title, title) == 0)
+		return 1;
+
+	/* Fuzzy match to avoid missing menus with slightly different titles. */
+	size_t root_len = strlen(root_title);
+	size_t title_len = strlen(title);
+	if (!root_len || !title_len)
+		return 1;
+
+	for (size_t i = 0; i + title_len <= root_len; i++) {
+		size_t j = 0;
+		for (; j < title_len; j++) {
+			if (tolower((unsigned char)root_title[i + j]) !=
+			    tolower((unsigned char)title[j]))
+				break;
+		}
+		if (j == title_len)
+			return 1;
+	}
+
+	for (size_t i = 0; i + root_len <= title_len; i++) {
+		size_t j = 0;
+		for (; j < root_len; j++) {
+			if (tolower((unsigned char)title[i + j]) !=
+			    tolower((unsigned char)root_title[j]))
+				break;
+		}
+		if (j == root_len)
+			return 1;
+	}
+
+	return 0;
+}
+
+static int ax_element_is_menu_container(AXUIElementRef element)
+{
+	CFTypeRef role = NULL;
+	int is_menu = 0;
+
+	if (!element)
+		return 0;
+
+	if (AXUIElementCopyAttributeValue(element, kAXRoleAttribute, &role) ==
+		    kAXErrorSuccess && role) {
+		if (CFGetTypeID(role) == CFStringGetTypeID()) {
+			CFStringRef role_str = (CFStringRef)role;
+			is_menu = CFEqual(role_str, ax_menu_role()) ||
+				  CFEqual(role_str, ax_menu_bar_role());
+		}
+		CFRelease(role);
+	}
+
+	return is_menu;
+}
+
 static CFStringRef ax_focused_ui_element_attribute(void)
 {
 #ifdef kAXFocusedUIElementAttribute
@@ -816,6 +953,79 @@ static int ax_actions_match(CFArrayRef actions)
 
 static int ax_element_supports_action(AXUIElementRef element);
 
+static AXUIElementRef ax_menu_root_for_element(AXUIElementRef element)
+{
+	AXUIElementRef current = NULL;
+
+	if (!element)
+		return NULL;
+
+	CFRetain(element);
+	current = element;
+
+	for (int i = 0; i < 6 && current; i++) {
+		CFTypeRef role = NULL;
+		int is_menu = 0;
+
+		if (AXUIElementCopyAttributeValue(current, kAXRoleAttribute, &role) ==
+			    kAXErrorSuccess && role) {
+			if (CFGetTypeID(role) == CFStringGetTypeID())
+				is_menu = CFEqual((CFStringRef)role, ax_menu_role());
+			CFRelease(role);
+		}
+
+		if (is_menu) {
+			return current;
+		}
+
+		AXUIElementRef parent = NULL;
+		if (AXUIElementCopyAttributeValue(current, kAXParentAttribute,
+						  (CFTypeRef *)&parent) != kAXErrorSuccess ||
+		    !parent) {
+			CFRelease(current);
+			break;
+		}
+
+		CFRelease(current);
+		current = parent;
+	}
+
+	return NULL;
+}
+
+static AXUIElementRef ax_menu_from_menu_bar_item(AXUIElementRef element)
+{
+	CFTypeRef role = NULL;
+	AXUIElementRef menu = NULL;
+	int is_menu_bar_item = 0;
+
+	if (!element)
+		return NULL;
+
+	if (AXUIElementCopyAttributeValue(element, kAXRoleAttribute, &role) ==
+		    kAXErrorSuccess && role) {
+		if (CFGetTypeID(role) == CFStringGetTypeID())
+			is_menu_bar_item =
+				CFEqual((CFStringRef)role, ax_menu_bar_item_role());
+		CFRelease(role);
+	}
+
+	if (!is_menu_bar_item)
+		return NULL;
+
+	if (AXUIElementCopyAttributeValue(element, ax_menu_attribute(),
+					  (CFTypeRef *)&menu) != kAXErrorSuccess)
+		return NULL;
+
+	if (!menu || CFGetTypeID(menu) != AXUIElementGetTypeID()) {
+		if (menu)
+			CFRelease(menu);
+		return NULL;
+	}
+
+	return menu;
+}
+
 static int ax_parent_is_actionable(AXUIElementRef element)
 {
 	AXUIElementRef parent = NULL;
@@ -952,6 +1162,8 @@ static int ax_element_is_interactable(AXUIElementRef element)
 	int hidden = 0;
 	int matches = 0;
 	int is_text_or_image = 0;
+	int is_menu_container = 0;
+	int menu_has_label = 0;
 
 	if (!element)
 		return 0;
@@ -963,6 +1175,9 @@ static int ax_element_is_interactable(AXUIElementRef element)
 			is_text_or_image =
 				CFEqual(role_str, kAXStaticTextRole) ||
 				CFEqual(role_str, ax_image_role());
+			is_menu_container =
+				CFEqual(role_str, ax_menu_role()) ||
+				CFEqual(role_str, ax_menu_bar_role());
 			matches = ax_role_matches((CFStringRef)role);
 		}
 		CFRelease(role);
@@ -985,6 +1200,16 @@ static int ax_element_is_interactable(AXUIElementRef element)
 		if (ax_debug_verbose())
 			ax_debug_log_element(element, "SKIP", -1, -1);
 		return 0;
+	}
+
+	if (is_menu_container) {
+		menu_has_label =
+			ax_element_has_string_attr(element, kAXTitleAttribute) ||
+			ax_element_has_string_attr(element, kAXValueAttribute) ||
+			ax_element_has_string_attr(element, kAXDescriptionAttribute) ||
+			ax_element_has_string_attr(element, kAXHelpAttribute);
+		if (!menu_has_label)
+			return 0;
 	}
 
 	if (is_text_or_image && ax_parent_is_actionable(element))
@@ -1251,7 +1476,9 @@ static void collect_interactable_hints(AXUIElementRef element, struct screen *sc
 static void collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 			      const CGRect *window_frame,
 			      struct hint *hints, size_t max_hints,
-			      size_t *count, uint64_t deadline_us)
+			      size_t *count, uint64_t deadline_us,
+			      int skip_menu_containers,
+			      int include_menu_attr)
 {
 	AXUIElementRef queue[BFS_QUEUE_SIZE];
 	size_t queue_head = 0;
@@ -1274,29 +1501,43 @@ static void collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 		/* Check if interactable */
 		if (ax_element_is_interactable(element)) {
 			int x, y;
-			if (ax_element_center_for_screen(element, scr, window_frame, &x, &y)) {
-				/* Skip duplicate positions */
-				if (hint_position_exists(hints, *count, x, y)) {
-					ax_debug_log_element(element, "MENU_DUP", x, y);
+			int add_hint = 1;
+
+			if (skip_menu_containers &&
+			    ax_element_is_menu_container(element))
+				add_hint = 0;
+
+			if (add_hint) {
+				if (ax_element_center_for_screen(element, scr, window_frame,
+								 &x, &y)) {
+					/* Skip duplicate positions */
+					if (hint_position_exists(hints, *count, x, y)) {
+						ax_debug_log_element(element, "MENU_DUP", x, y);
+					} else {
+						hints[*count].x = x;
+						hints[*count].y = y;
+						(*count)++;
+						ax_debug_log_element(element, "MENU", x, y);
+					}
 				} else {
-					hints[*count].x = x;
-					hints[*count].y = y;
-					(*count)++;
-					ax_debug_log_element(element, "MENU", x, y);
+					ax_debug_log_element(element, "MENU_OFFSCREEN", -1, -1);
 				}
-			} else {
-				ax_debug_log_element(element, "MENU_OFFSCREEN", -1, -1);
 			}
 		}
 
 		/* Enqueue children from multiple attributes */
-		CFStringRef child_attrs[] = {
-			kAXChildrenAttribute,
-			ax_visible_children_attribute(),
-			ax_children_in_navigation_order_attribute(),
-		};
+		CFStringRef child_attrs[4];
+		size_t attr_count = 3;
 
-		for (size_t attr_idx = 0; attr_idx < 3; attr_idx++) {
+		child_attrs[0] = kAXChildrenAttribute;
+		child_attrs[1] = ax_visible_children_attribute();
+		child_attrs[2] = ax_children_in_navigation_order_attribute();
+		if (include_menu_attr) {
+			child_attrs[3] = ax_menu_attribute();
+			attr_count = 4;
+		}
+
+		for (size_t attr_idx = 0; attr_idx < attr_count; attr_idx++) {
 			CFTypeRef children_ref = NULL;
 			if (AXUIElementCopyAttributeValue(element, child_attrs[attr_idx],
 							  &children_ref) == kAXErrorSuccess &&
@@ -1330,6 +1571,191 @@ static void collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 	}
 }
 
+static void collect_menu_hints_with_poll(AXUIElementRef menu_root,
+					 struct screen *scr,
+					 struct hint *hints, size_t max_hints,
+					 size_t *count, uint64_t deadline_us)
+{
+	int poll_ms = ax_env_int("WARPD_AX_MENU_POLL_MS", 200);
+	int poll_interval_ms = ax_env_int("WARPD_AX_MENU_POLL_INTERVAL_MS", 30);
+	int stable_runs_needed = ax_env_int("WARPD_AX_MENU_STABLE_RUNS", 2);
+	int min_runs = ax_env_int("WARPD_AX_MENU_POLL_MIN_RUNS", 2);
+	uint64_t poll_deadline_us =
+		get_time_us() + (uint64_t)poll_ms * 1000;
+	int stable_runs = 0;
+	int runs = 0;
+	size_t last_temp_count = 0;
+	size_t base_count = *count;
+	size_t best_count = *count;
+	struct hint base_hints[MAX_HINTS];
+	struct hint best_hints[MAX_HINTS];
+	struct hint temp_hints[MAX_HINTS];
+	CGRect menu_frame = CGRectZero;
+	const CGRect *menu_frame_ptr = NULL;
+
+	if (!menu_root)
+		return;
+
+	if (ax_get_position_size(menu_root, &menu_frame.origin,
+				 &menu_frame.size) &&
+	    menu_frame.size.width >= 20 &&
+	    menu_frame.size.height >= 20)
+		menu_frame_ptr = &menu_frame;
+
+	if (base_count >= max_hints)
+		return;
+
+	if (poll_deadline_us > deadline_us)
+		poll_deadline_us = deadline_us;
+
+	memcpy(base_hints, hints, sizeof(struct hint) * base_count);
+	memcpy(best_hints, hints, sizeof(struct hint) * base_count);
+	last_temp_count = base_count;
+
+	while (get_time_us() < poll_deadline_us && *count < max_hints) {
+		size_t temp_count = base_count;
+
+		memcpy(temp_hints, base_hints, sizeof(struct hint) * base_count);
+		collect_hints_bfs(menu_root, scr, menu_frame_ptr, temp_hints, max_hints,
+				  &temp_count, deadline_us, 1, 0);
+
+		if (temp_count > best_count) {
+			memcpy(best_hints, temp_hints,
+			       sizeof(struct hint) * temp_count);
+			best_count = temp_count;
+		}
+
+		runs++;
+		if (temp_count == last_temp_count)
+			stable_runs++;
+		else
+			stable_runs = 0;
+		last_temp_count = temp_count;
+		if (runs >= min_runs && stable_runs >= stable_runs_needed)
+			break;
+
+		if (poll_interval_ms > 0)
+			usleep((useconds_t)poll_interval_ms * 1000);
+	}
+
+	memcpy(hints, best_hints, sizeof(struct hint) * best_count);
+	*count = best_count;
+}
+
+static size_t collect_menu_hints_from_menu_bar(AXUIElementRef app,
+					       struct screen *scr,
+					       struct hint *base_hints,
+					       size_t base_count,
+					       size_t max_hints,
+					       struct hint *out_hints,
+					       uint64_t deadline_us)
+{
+	AXUIElementRef menu_bar = NULL;
+	CFTypeRef children_ref = NULL;
+	size_t best_count = 0;
+	double best_distance = DBL_MAX;
+	NSPoint mouse_loc = [NSEvent mouseLocation];
+	double mouse_x = mouse_loc.x;
+	AXUIElementRef best_menu_item = NULL;
+
+	if (!app || !base_hints || !out_hints)
+		return 0;
+
+	if (AXUIElementCopyAttributeValue(app, ax_menu_bar_attribute(),
+					  (CFTypeRef *)&menu_bar) != kAXErrorSuccess ||
+	    !menu_bar)
+		return 0;
+
+	if (AXUIElementCopyAttributeValue(menu_bar, kAXChildrenAttribute,
+					  &children_ref) != kAXErrorSuccess ||
+	    !children_ref) {
+		CFRelease(menu_bar);
+		return 0;
+	}
+
+	if (CFGetTypeID(children_ref) != CFArrayGetTypeID()) {
+		CFRelease(children_ref);
+		CFRelease(menu_bar);
+		return 0;
+	}
+
+	CFArrayRef children = (CFArrayRef)children_ref;
+	CFIndex child_count = CFArrayGetCount(children);
+	for (CFIndex i = 0; i < child_count; i++) {
+		CFTypeRef child_ref = CFArrayGetValueAtIndex(children, i);
+		AXUIElementRef menu_item = NULL;
+		CFTypeRef role = NULL;
+		int is_menu_bar_item = 0;
+		CGPoint position = CGPointZero;
+		CGSize size = CGSizeZero;
+
+		if (!child_ref || CFGetTypeID(child_ref) != AXUIElementGetTypeID())
+			continue;
+
+		menu_item = (AXUIElementRef)child_ref;
+
+		if (AXUIElementCopyAttributeValue(menu_item, kAXRoleAttribute,
+						  &role) == kAXErrorSuccess &&
+		    role) {
+			if (CFGetTypeID(role) == CFStringGetTypeID())
+				is_menu_bar_item =
+					CFEqual((CFStringRef)role,
+						ax_menu_bar_item_role());
+			CFRelease(role);
+		}
+
+		if (!is_menu_bar_item)
+			continue;
+
+		if (!ax_get_position_size(menu_item, &position, &size) ||
+		    size.width < 5 || size.height < 5)
+			continue;
+
+		double left = position.x;
+		double right = position.x + size.width;
+		double distance = 0.0;
+		if (mouse_x < left)
+			distance = left - mouse_x;
+		else if (mouse_x > right)
+			distance = mouse_x - right;
+
+		if (distance < best_distance) {
+			if (best_menu_item)
+				CFRelease(best_menu_item);
+			CFRetain(menu_item);
+			best_menu_item = menu_item;
+			best_distance = distance;
+		}
+	}
+
+	CFRelease(children_ref);
+	CFRelease(menu_bar);
+
+	if (!best_menu_item)
+		return 0;
+
+	AXUIElementRef menu_root = NULL;
+	if (AXUIElementCopyAttributeValue(best_menu_item, ax_menu_attribute(),
+					  (CFTypeRef *)&menu_root) != kAXErrorSuccess ||
+	    !menu_root) {
+		CFRelease(best_menu_item);
+		return 0;
+	}
+
+	size_t temp_count = base_count;
+	struct hint temp_hints[MAX_HINTS];
+	memcpy(temp_hints, base_hints, sizeof(struct hint) * base_count);
+	collect_menu_hints_with_poll(menu_root, scr, temp_hints, max_hints,
+				     &temp_count, deadline_us);
+
+	memcpy(out_hints, temp_hints, sizeof(struct hint) * temp_count);
+	best_count = temp_count;
+
+	CFRelease(menu_root);
+	CFRelease(best_menu_item);
+	return best_count;
+}
+
 size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 				      size_t max_hints)
 {
@@ -1346,6 +1772,7 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 	/* Enable accessibility for apps that need explicit attribute setting */
 	int app_flags = enable_app_accessibility(focused_app);
 	int is_electron = (app_flags & APP_FLAG_ELECTRON) != 0;
+	AXUIElementRef focused_element = NULL;
 
 	ax_debug_log("=== Starting hint collection (max=%zu) ===\n", max_hints);
 
@@ -1359,6 +1786,10 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 	 */
 	int menu_deadline_ms = ax_env_int("WARPD_AX_MENU_DEADLINE_MS",
 					  is_electron ? 200 : 100);
+	int menu_open_deadline_ms =
+		ax_env_int("WARPD_AX_MENU_OPEN_DEADLINE_MS", 300);
+	int menu_retries = ax_env_int("WARPD_AX_MENU_RETRIES", 3);
+	int menu_retry_delay_ms = ax_env_int("WARPD_AX_MENU_RETRY_DELAY_MS", 30);
 	uint64_t menu_deadline_us =
 		get_time_us() + (uint64_t)menu_deadline_ms * 1000;
 
@@ -1373,10 +1804,9 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 		if (should_dump)
 			ax_debug_dump_tree(menu_bar, "app_menu_bar");
 		collect_hints_bfs(menu_bar, scr, NULL, hints, max_hints,
-				  &count, menu_deadline_us);
+				  &count, menu_deadline_us, 1, 0);
 		CFRelease(menu_bar);
 	}
-
 
 	/* System menu bar (Apple menu, status items) - also BFS */
 	if (count < max_hints && get_time_us() < menu_deadline_us) {
@@ -1389,11 +1819,179 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 				if (should_dump)
 					ax_debug_dump_tree(menu_bar, "system_menu_bar");
 				collect_hints_bfs(menu_bar, scr, NULL, hints, max_hints,
-						  &count, menu_deadline_us);
+						  &count, menu_deadline_us, 1, 0);
 				CFRelease(menu_bar);
 			}
 			CFRelease(system);
 		}
+	}
+
+	size_t menu_bar_count = count;
+	struct hint menu_bar_hints[MAX_HINTS];
+	struct hint best_menu_hints[MAX_HINTS];
+	size_t best_menu_count = menu_bar_count;
+
+	memcpy(menu_bar_hints, hints, sizeof(struct hint) * menu_bar_count);
+	memcpy(best_menu_hints, hints, sizeof(struct hint) * menu_bar_count);
+
+	for (int attempt = 0;
+	     attempt < menu_retries && best_menu_count < max_hints &&
+	     get_time_us() < menu_deadline_us;
+	     attempt++) {
+		size_t candidate_count = 0;
+		struct hint candidate_hints[MAX_HINTS];
+		int saw_menu = 0;
+		size_t bar_candidate_count = 0;
+		struct hint bar_candidate_hints[MAX_HINTS];
+
+		if (attempt > 0 && menu_retry_delay_ms > 0)
+			usleep((useconds_t)menu_retry_delay_ms * 1000);
+
+		if (get_time_us() < menu_deadline_us) {
+			AXUIElementRef temp_focused = NULL;
+			AXUIElementRef temp_menu_root = NULL;
+			AXUIElementRef temp_menu_direct = NULL;
+			char focused_title[256];
+			focused_title[0] = 0;
+			if (AXUIElementCopyAttributeValue(
+				focused_app, ax_focused_ui_element_attribute(),
+				(CFTypeRef *)&temp_focused) == kAXErrorSuccess &&
+			    temp_focused) {
+				ax_menu_bar_item_title(temp_focused, focused_title,
+						       sizeof focused_title);
+				temp_menu_direct = ax_menu_from_menu_bar_item(temp_focused);
+				temp_menu_root = temp_menu_direct ?
+					temp_menu_direct :
+					ax_menu_root_for_element(temp_focused);
+				if (temp_menu_root) {
+					size_t local_count = menu_bar_count;
+					struct hint local_hints[MAX_HINTS];
+					saw_menu = 1;
+					if (!ax_menu_root_matches_title(temp_menu_root,
+								        focused_title)) {
+						CFRelease(temp_menu_root);
+						CFRelease(temp_focused);
+						continue;
+					}
+					if (menu_open_deadline_ms > menu_deadline_ms) {
+						uint64_t extended =
+							get_time_us() + (uint64_t)menu_open_deadline_ms * 1000;
+						if (extended > menu_deadline_us)
+							menu_deadline_us = extended;
+					}
+					if (should_dump)
+						ax_debug_dump_tree(temp_menu_root, temp_menu_direct ?
+								  "menu_root_focus_direct" : "menu_root");
+					memcpy(local_hints, menu_bar_hints,
+					       sizeof(struct hint) * menu_bar_count);
+					collect_menu_hints_with_poll(temp_menu_root, scr,
+								     local_hints, max_hints,
+								     &local_count,
+								     menu_deadline_us);
+					if (local_count >= candidate_count) {
+						memcpy(candidate_hints, local_hints,
+						       sizeof(struct hint) * local_count);
+						candidate_count = local_count;
+					}
+				}
+				if (temp_menu_root)
+					CFRelease(temp_menu_root);
+				CFRelease(temp_focused);
+			}
+		}
+
+		if (get_time_us() < menu_deadline_us) {
+			AXUIElementRef system = AXUIElementCreateSystemWide();
+			if (system) {
+				AXUIElementRef sys_focused = NULL;
+				AXUIElementRef sys_menu_root = NULL;
+				AXUIElementRef sys_menu_direct = NULL;
+				char sys_focused_title[256];
+				sys_focused_title[0] = 0;
+				if (AXUIElementCopyAttributeValue(
+					system, ax_focused_ui_element_attribute(),
+					(CFTypeRef *)&sys_focused) == kAXErrorSuccess &&
+				    sys_focused) {
+					ax_menu_bar_item_title(sys_focused, sys_focused_title,
+							       sizeof sys_focused_title);
+					sys_menu_direct = ax_menu_from_menu_bar_item(sys_focused);
+					sys_menu_root = sys_menu_direct ?
+						sys_menu_direct :
+						ax_menu_root_for_element(sys_focused);
+					if (sys_menu_root) {
+						size_t local_count = menu_bar_count;
+						struct hint local_hints[MAX_HINTS];
+						saw_menu = 1;
+						if (!ax_menu_root_matches_title(sys_menu_root,
+									        sys_focused_title)) {
+							CFRelease(sys_menu_root);
+							CFRelease(sys_focused);
+							continue;
+						}
+						if (menu_open_deadline_ms > menu_deadline_ms) {
+							uint64_t extended =
+								get_time_us() + (uint64_t)menu_open_deadline_ms * 1000;
+							if (extended > menu_deadline_us)
+								menu_deadline_us = extended;
+						}
+						if (should_dump)
+							ax_debug_dump_tree(sys_menu_root, sys_menu_direct ?
+									  "menu_root_system_direct" :
+									  "menu_root_system");
+						memcpy(local_hints, menu_bar_hints,
+						       sizeof(struct hint) * menu_bar_count);
+						collect_menu_hints_with_poll(sys_menu_root, scr,
+									     local_hints, max_hints,
+									     &local_count,
+									     menu_deadline_us);
+						if (local_count > candidate_count) {
+							memcpy(candidate_hints, local_hints,
+							       sizeof(struct hint) * local_count);
+							candidate_count = local_count;
+						}
+					}
+				}
+				if (sys_menu_root)
+					CFRelease(sys_menu_root);
+				if (sys_focused)
+					CFRelease(sys_focused);
+				CFRelease(system);
+			}
+		}
+
+		if (get_time_us() < menu_deadline_us) {
+			bar_candidate_count = collect_menu_hints_from_menu_bar(
+				focused_app, scr, menu_bar_hints, menu_bar_count,
+				max_hints, bar_candidate_hints, menu_deadline_us);
+			if (bar_candidate_count > 0) {
+				saw_menu = 1;
+				if (bar_candidate_count > candidate_count) {
+					memcpy(candidate_hints, bar_candidate_hints,
+					       sizeof(struct hint) * bar_candidate_count);
+					candidate_count = bar_candidate_count;
+				}
+			}
+		}
+
+		if (candidate_count > best_menu_count) {
+			memcpy(best_menu_hints, candidate_hints,
+			       sizeof(struct hint) * candidate_count);
+			best_menu_count = candidate_count;
+		}
+
+		if (saw_menu && candidate_count == best_menu_count)
+			break;
+	}
+
+	if (best_menu_count != menu_bar_count) {
+		memcpy(hints, best_menu_hints, sizeof(struct hint) * best_menu_count);
+		count = best_menu_count;
+	}
+
+	if (AXUIElementCopyAttributeValue(
+		focused_app, ax_focused_ui_element_attribute(),
+		(CFTypeRef *)&focused_element) != kAXErrorSuccess) {
+		focused_element = NULL;
 	}
 
 	/*
@@ -1432,7 +2030,7 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 			ax_debug_log("\n--- PHASE 2.1: Window Content (BFS, %dms deadline) ---\n",
 				     window_bfs_deadline_ms);
 			collect_hints_bfs(focused_window, scr, NULL,
-					  hints, max_hints, &count, bfs_deadline_us);
+					  hints, max_hints, &count, bfs_deadline_us, 0, 0);
 		}
 		collect_interactable_hints(focused_window, scr, NULL,
 				  hints, max_hints, &count, deadline_us, visited);
@@ -1462,20 +2060,17 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 
 	/* Also check focused UI element for additional hints */
 	if (count < max_hints && get_time_us() < deadline_us) {
-		AXUIElementRef focused_element = NULL;
-		if (AXUIElementCopyAttributeValue(
-			focused_app, ax_focused_ui_element_attribute(),
-			(CFTypeRef *)&focused_element) == kAXErrorSuccess &&
-		    focused_element) {
+		if (focused_element) {
 			if (should_dump)
 				ax_debug_dump_tree(focused_element, "focused_element");
 			collect_interactable_hints(focused_element, scr, NULL,
 					  hints, max_hints, &count,
 					  deadline_us, visited);
-			CFRelease(focused_element);
 		}
-
 	}
+
+	if (focused_element)
+		CFRelease(focused_element);
 
 	if (visited)
 		CFRelease(visited);

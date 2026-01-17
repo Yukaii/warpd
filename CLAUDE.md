@@ -508,6 +508,13 @@ env WARPD_AX_DUMP=1 ./bin/warpd
 
 # Optional: tune deadlines and de-dup tolerance (macOS)
 # env WARPD_AX_MENU_DEADLINE_MS=150 ./bin/warpd
+# env WARPD_AX_MENU_OPEN_DEADLINE_MS=300 ./bin/warpd
+# env WARPD_AX_MENU_RETRIES=3 ./bin/warpd
+# env WARPD_AX_MENU_RETRY_DELAY_MS=30 ./bin/warpd
+# env WARPD_AX_MENU_POLL_MS=200 ./bin/warpd
+# env WARPD_AX_MENU_POLL_INTERVAL_MS=30 ./bin/warpd
+# env WARPD_AX_MENU_POLL_MIN_RUNS=2 ./bin/warpd
+# env WARPD_AX_MENU_STABLE_RUNS=2 ./bin/warpd
 # env WARPD_AX_WINDOW_DEADLINE_MS=1200 ./bin/warpd
 # env WARPD_AX_WINDOW_BFS_DEADLINE_MS=250 ./bin/warpd
 # env WARPD_AX_DEDUP_PX=3 ./bin/warpd
