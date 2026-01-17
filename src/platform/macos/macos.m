@@ -220,6 +220,9 @@ static void enable_app_accessibility(AXUIElementRef app)
 
 	CFBooleanRef value = kCFBooleanTrue;
 
+	int is_chromium = 0;
+	int is_electron = 0;
+
 	/* Chrome and Chromium-based browsers need AXEnhancedUserInterface */
 	static NSArray *chromiumBundleIds = nil;
 	if (!chromiumBundleIds) {
@@ -236,11 +239,8 @@ static void enable_app_accessibility(AXUIElementRef app)
 
 	for (NSString *chromiumId in chromiumBundleIds) {
 		if ([bundleId hasPrefix:chromiumId]) {
-			AXUIElementSetAttributeValue(app,
-				CFSTR("AXEnhancedUserInterface"), value);
-			ax_debug_log("Enabled AXEnhancedUserInterface for: %s\n",
-				[bundleId UTF8String]);
-			return;
+			is_chromium = 1;
+			break;
 		}
 	}
 
@@ -264,12 +264,28 @@ static void enable_app_accessibility(AXUIElementRef app)
 
 	for (NSString *electronId in electronBundleIds) {
 		if ([bundleId hasPrefix:electronId]) {
-			AXUIElementSetAttributeValue(app,
-				CFSTR("AXManualAccessibility"), value);
-			ax_debug_log("Enabled AXManualAccessibility for Electron app: %s\n",
-				[bundleId UTF8String]);
-			return;
+			is_electron = 1;
+			break;
 		}
+	}
+
+	if (is_chromium) {
+		AXUIElementSetAttributeValue(app,
+			CFSTR("AXEnhancedUserInterface"), value);
+		ax_debug_log("Enabled AXEnhancedUserInterface for: %s\n",
+			[bundleId UTF8String]);
+	}
+
+	if (is_electron) {
+		AXUIElementSetAttributeValue(app,
+			CFSTR("AXManualAccessibility"), value);
+		ax_debug_log("Enabled AXManualAccessibility for Electron app: %s\n",
+			[bundleId UTF8String]);
+	}
+
+	if (is_chromium || is_electron) {
+		ax_debug_log("Accessibility attributes set for: %s\n",
+			[bundleId UTF8String]);
 	}
 }
 
@@ -418,6 +434,15 @@ static CFStringRef ax_contents_attribute(void)
 	return kAXContentsAttribute;
 #else
 	return CFSTR("AXContents");
+#endif
+}
+
+static CFStringRef ax_frame_attribute(void)
+{
+#ifdef kAXFrameAttribute
+	return kAXFrameAttribute;
+#else
+	return CFSTR("AXFrame");
 #endif
 }
 
@@ -755,8 +780,23 @@ static int ax_actions_match(CFArrayRef actions)
 		    CFEqual(action, kAXPickAction) ||
 		    CFEqual(action, kAXIncrementAction) ||
 		    CFEqual(action, kAXDecrementAction) ||
+		    CFEqual(action, kAXShowAlternateUIAction) ||
+		    CFEqual(action, kAXShowDefaultUIAction) ||
+#ifdef kAXShowDetailsAction
+		    CFEqual(action, kAXShowDetailsAction) ||
+#else
+		    CFEqual(action, CFSTR("AXShowDetails")) ||
+#endif
+#ifdef kAXJumpAction
+		    CFEqual(action, kAXJumpAction) ||
+#else
 		    CFEqual(action, CFSTR("AXJump")) ||
+#endif
+#ifdef kAXOpenAction
+		    CFEqual(action, kAXOpenAction) ||
+#else
 		    CFEqual(action, CFSTR("AXOpen")) ||
+#endif
 		    CFEqual(action, CFSTR("AXScrollToVisible"))) {
 			return 1;
 		}
@@ -916,34 +956,45 @@ static int ax_get_position_size(AXUIElementRef element, CGPoint *position,
 {
 	AXValueRef position_value = NULL;
 	AXValueRef size_value = NULL;
+	AXValueRef frame_value = NULL;
+	int has_position = 0;
+	int has_size = 0;
 
 	if (!element)
 		return 0;
 
 	if (AXUIElementCopyAttributeValue(element, kAXPositionAttribute,
-				      (CFTypeRef *)&position_value) != kAXErrorSuccess ||
-	    !position_value)
-		return 0;
-
-	if (!AXValueGetValue(position_value, kAXValueCGPointType, position)) {
+				      (CFTypeRef *)&position_value) == kAXErrorSuccess &&
+	    position_value) {
+		has_position = AXValueGetValue(position_value, kAXValueCGPointType,
+					       position);
 		CFRelease(position_value);
-		return 0;
 	}
-
-	CFRelease(position_value);
 
 	if (AXUIElementCopyAttributeValue(element, kAXSizeAttribute,
-				      (CFTypeRef *)&size_value) != kAXErrorSuccess ||
-	    !size_value)
-		return 0;
-
-	if (!AXValueGetValue(size_value, kAXValueCGSizeType, size)) {
+				      (CFTypeRef *)&size_value) == kAXErrorSuccess &&
+	    size_value) {
+		has_size = AXValueGetValue(size_value, kAXValueCGSizeType, size);
 		CFRelease(size_value);
-		return 0;
 	}
 
-	CFRelease(size_value);
-	return 1;
+	if (has_position && has_size)
+		return 1;
+
+	if (AXUIElementCopyAttributeValue(element, ax_frame_attribute(),
+				      (CFTypeRef *)&frame_value) == kAXErrorSuccess &&
+	    frame_value) {
+		CGRect frame = CGRectZero;
+		if (AXValueGetValue(frame_value, kAXValueCGRectType, &frame)) {
+			*position = frame.origin;
+			*size = frame.size;
+			CFRelease(frame_value);
+			return 1;
+		}
+		CFRelease(frame_value);
+	}
+
+	return 0;
 }
 
 static int ax_element_center_for_screen(AXUIElementRef element, struct screen *scr,

@@ -464,6 +464,7 @@ Electron apps require `AXManualAccessibility = true` attribute to expose their a
 - `AXManualAccessibility` - attribute to enable Electron app accessibility
 - `AXTabs` - accessibility attribute for window tabs (not used by browsers)
 - `AXTabGroup` - accessibility role for tab containers
+- `AXFrame` - alternative frame attribute for some elements
 - `--force-renderer-accessibility` - Chrome command-line flag
 - `chrome://accessibility` - Chrome's accessibility settings page
 - `accessibility.force_disabled` - Firefox about:config preference
