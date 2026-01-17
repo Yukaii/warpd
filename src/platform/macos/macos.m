@@ -5,6 +5,7 @@
  */
 
 #include "macos.h"
+#include <limits.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -190,6 +191,9 @@ static int is_focused_app_kitty(void)
 	return 0;
 }
 
+#define APP_FLAG_CHROMIUM 1
+#define APP_FLAG_ELECTRON 2
+
 /*
  * Enable accessibility for apps that require explicit attribute setting.
  *
@@ -200,28 +204,29 @@ static int is_focused_app_kitty(void)
  * These attributes signal to the app that an assistive technology is present,
  * causing them to populate their full accessibility trees.
  */
-static void enable_app_accessibility(AXUIElementRef app)
+static int enable_app_accessibility(AXUIElementRef app)
 {
 	if (!app)
-		return;
+		return 0;
 
 	pid_t pid;
 	if (AXUIElementGetPid(app, &pid) != kAXErrorSuccess)
-		return;
+		return 0;
 
 	NSRunningApplication *runningApp =
 		[NSRunningApplication runningApplicationWithProcessIdentifier:pid];
 	if (!runningApp)
-		return;
+		return 0;
 
 	NSString *bundleId = [runningApp bundleIdentifier];
 	if (!bundleId)
-		return;
+		return 0;
 
 	CFBooleanRef value = kCFBooleanTrue;
 
 	int is_chromium = 0;
 	int is_electron = 0;
+	int flags = 0;
 
 	/* Chrome and Chromium-based browsers need AXEnhancedUserInterface */
 	static NSArray *chromiumBundleIds = nil;
@@ -274,6 +279,7 @@ static void enable_app_accessibility(AXUIElementRef app)
 			CFSTR("AXEnhancedUserInterface"), value);
 		ax_debug_log("Enabled AXEnhancedUserInterface for: %s\n",
 			[bundleId UTF8String]);
+		flags |= APP_FLAG_CHROMIUM;
 	}
 
 	if (is_electron) {
@@ -281,12 +287,15 @@ static void enable_app_accessibility(AXUIElementRef app)
 			CFSTR("AXManualAccessibility"), value);
 		ax_debug_log("Enabled AXManualAccessibility for Electron app: %s\n",
 			[bundleId UTF8String]);
+		flags |= APP_FLAG_ELECTRON;
 	}
 
 	if (is_chromium || is_electron) {
 		ax_debug_log("Accessibility attributes set for: %s\n",
 			[bundleId UTF8String]);
 	}
+
+	return flags;
 }
 
 static CFStringRef get_selected_text_via_accessibility(void)
@@ -805,6 +814,36 @@ static int ax_actions_match(CFArrayRef actions)
 	return 0;
 }
 
+static int ax_element_supports_action(AXUIElementRef element);
+
+static int ax_parent_is_actionable(AXUIElementRef element)
+{
+	AXUIElementRef parent = NULL;
+	CFTypeRef role = NULL;
+	int matches = 0;
+
+	if (!element)
+		return 0;
+
+	if (AXUIElementCopyAttributeValue(element, kAXParentAttribute,
+					  (CFTypeRef *)&parent) != kAXErrorSuccess ||
+	    !parent)
+		return 0;
+
+	if (AXUIElementCopyAttributeValue(parent, kAXRoleAttribute, &role) ==
+		    kAXErrorSuccess && role) {
+		if (CFGetTypeID(role) == CFStringGetTypeID())
+			matches = ax_role_matches((CFStringRef)role);
+		CFRelease(role);
+	}
+
+	if (!matches)
+		matches = ax_element_supports_action(parent);
+
+	CFRelease(parent);
+	return matches;
+}
+
 static int ax_element_supports_action(AXUIElementRef element)
 {
 	CFArrayRef actions = NULL;
@@ -912,14 +951,20 @@ static int ax_element_is_interactable(AXUIElementRef element)
 	int enabled = 1;
 	int hidden = 0;
 	int matches = 0;
+	int is_text_or_image = 0;
 
 	if (!element)
 		return 0;
 
 	if (AXUIElementCopyAttributeValue(element, kAXRoleAttribute, &role) ==
 		    kAXErrorSuccess && role) {
-		if (CFGetTypeID(role) == CFStringGetTypeID())
+		if (CFGetTypeID(role) == CFStringGetTypeID()) {
+			CFStringRef role_str = (CFStringRef)role;
+			is_text_or_image =
+				CFEqual(role_str, kAXStaticTextRole) ||
+				CFEqual(role_str, ax_image_role());
 			matches = ax_role_matches((CFStringRef)role);
+		}
 		CFRelease(role);
 	}
 
@@ -941,6 +986,9 @@ static int ax_element_is_interactable(AXUIElementRef element)
 			ax_debug_log_element(element, "SKIP", -1, -1);
 		return 0;
 	}
+
+	if (is_text_or_image && ax_parent_is_actionable(element))
+		return 0;
 
 	if (ax_get_bool_attr(element, kAXEnabledAttribute, &enabled) && !enabled)
 		return 0;
@@ -1039,7 +1087,8 @@ static void collect_interactable_hints(AXUIElementRef element, struct screen *sc
 					const CGRect *window_frame,
 					struct hint *hints,
 					size_t max_hints, size_t *count,
-					uint64_t deadline_us);
+					uint64_t deadline_us,
+					CFMutableSetRef visited);
 
 static void collect_interactable_children(AXUIElementRef element,
 					  CFStringRef attribute,
@@ -1047,7 +1096,8 @@ static void collect_interactable_children(AXUIElementRef element,
 					  const CGRect *window_frame,
 					  struct hint *hints,
 					  size_t max_hints, size_t *count,
-					  uint64_t deadline_us)
+					  uint64_t deadline_us,
+					  CFMutableSetRef visited)
 {
 	CFTypeRef children_ref = NULL;
 
@@ -1074,7 +1124,7 @@ static void collect_interactable_children(AXUIElementRef element,
 			continue;
 		AXUIElementRef child = (AXUIElementRef)child_ref;
 		collect_interactable_hints(child, scr, window_frame,
-					  hints, max_hints, count, deadline_us);
+					  hints, max_hints, count, deadline_us, visited);
 		if (*count >= max_hints)
 			break;
 	}
@@ -1082,11 +1132,32 @@ static void collect_interactable_children(AXUIElementRef element,
 	CFRelease(children);
 }
 
+static int ax_env_int(const char *name, int default_value)
+{
+	const char *val = getenv(name);
+	char *end = NULL;
+	long parsed;
+
+	if (!val || !val[0])
+		return default_value;
+
+	parsed = strtol(val, &end, 10);
+	if (end == val || parsed < 0)
+		return default_value;
+
+	if (parsed > INT_MAX)
+		return default_value;
+
+	return (int)parsed;
+}
+
 /* Check if a hint already exists at or near the given position */
 static int hint_position_exists(struct hint *hints, size_t count, int x, int y)
 {
 	/* Use a small tolerance to avoid near-duplicates */
-	const int tolerance = 5;
+	int tolerance = ax_env_int("WARPD_AX_DEDUP_PX", 5);
+	if (tolerance < 0)
+		tolerance = 0;
 	for (size_t i = 0; i < count; i++) {
 		int dx = hints[i].x - x;
 		int dy = hints[i].y - y;
@@ -1107,7 +1178,8 @@ static void collect_interactable_hints(AXUIElementRef element, struct screen *sc
 					const CGRect *window_frame,
 					struct hint *hints,
 					size_t max_hints, size_t *count,
-					uint64_t deadline_us)
+					uint64_t deadline_us,
+					CFMutableSetRef visited)
 {
 	if (!element)
 		return;
@@ -1117,6 +1189,12 @@ static void collect_interactable_hints(AXUIElementRef element, struct screen *sc
 
 	if (deadline_us > 0 && get_time_us() >= deadline_us)
 		return;
+
+	if (visited) {
+		if (CFSetContainsValue(visited, element))
+			return;
+		CFSetAddValue(visited, element);
+	}
 
 	/* Log ALL elements when verbose mode is enabled */
 	if (ax_debug_verbose())
@@ -1144,24 +1222,24 @@ static void collect_interactable_hints(AXUIElementRef element, struct screen *sc
 	}
 
 	collect_interactable_children(element, kAXChildrenAttribute, scr,
-					 window_frame, hints, max_hints, count, deadline_us);
+					 window_frame, hints, max_hints, count, deadline_us, visited);
 	if (*count >= max_hints)
 		return;
 	collect_interactable_children(element, ax_visible_children_attribute(), scr,
-					 window_frame, hints, max_hints, count, deadline_us);
+					 window_frame, hints, max_hints, count, deadline_us, visited);
 	if (*count >= max_hints)
 		return;
 	collect_interactable_children(element, ax_children_in_navigation_order_attribute(),
-					 scr, window_frame, hints, max_hints, count, deadline_us);
+					 scr, window_frame, hints, max_hints, count, deadline_us, visited);
 	if (*count >= max_hints)
 		return;
 	collect_interactable_children(element, ax_contents_attribute(), scr,
-					 window_frame, hints, max_hints, count, deadline_us);
+					 window_frame, hints, max_hints, count, deadline_us, visited);
 	if (*count >= max_hints)
 		return;
 	/* Try to collect tabs if the element has an AXTabs attribute (e.g., browser tabs) */
 	collect_interactable_children(element, ax_tabs_attribute(), scr,
-					 window_frame, hints, max_hints, count, deadline_us);
+					 window_frame, hints, max_hints, count, deadline_us, visited);
 }
 
 /*
@@ -1266,7 +1344,8 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 	ax_debug_open();
 
 	/* Enable accessibility for apps that need explicit attribute setting */
-	enable_app_accessibility(focused_app);
+	int app_flags = enable_app_accessibility(focused_app);
+	int is_electron = (app_flags & APP_FLAG_ELECTRON) != 0;
 
 	ax_debug_log("=== Starting hint collection (max=%zu) ===\n", max_hints);
 
@@ -1278,9 +1357,13 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 	 * Scan menu bars FIRST using BFS - this ensures we get all top-level
 	 * menu items (File, Edit, View, etc.) before diving into submenus.
 	 */
-	uint64_t menu_deadline_us = get_time_us() + 100000; /* 100ms for menu bars */
+	int menu_deadline_ms = ax_env_int("WARPD_AX_MENU_DEADLINE_MS",
+					  is_electron ? 200 : 100);
+	uint64_t menu_deadline_us =
+		get_time_us() + (uint64_t)menu_deadline_ms * 1000;
 
-	ax_debug_log("\n--- PHASE 1: Menu Bars (BFS, 100ms deadline) ---\n");
+	ax_debug_log("\n--- PHASE 1: Menu Bars (BFS, %dms deadline) ---\n",
+		     menu_deadline_ms);
 
 	/* App menu bar - use BFS for breadth-first traversal */
 	AXUIElementRef menu_bar = NULL;
@@ -1317,9 +1400,18 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 	 * Now scan window content with DFS and a longer deadline.
 	 * DFS works better for deep trees like web content.
 	 */
-	ax_debug_log("\n--- PHASE 2: Window Content (DFS, 500ms deadline) ---\n");
+	int window_deadline_ms = ax_env_int("WARPD_AX_WINDOW_DEADLINE_MS",
+					    is_electron ? 1500 : 500);
+	int window_bfs_deadline_ms = ax_env_int("WARPD_AX_WINDOW_BFS_DEADLINE_MS",
+						is_electron ? 250 : 0);
+	uint64_t deadline_us =
+		get_time_us() + (uint64_t)window_deadline_ms * 1000;
 
-	uint64_t deadline_us = get_time_us() + 500000; /* 500ms for window content */
+	ax_debug_log("\n--- PHASE 2: Window Content (DFS, %dms deadline) ---\n",
+		     window_deadline_ms);
+
+	CFMutableSetRef visited =
+		CFSetCreateMutable(NULL, 0, &kCFTypeSetCallBacks);
 
 	AXUIElementRef focused_window = NULL;
 	error = AXUIElementCopyAttributeValue(
@@ -1334,8 +1426,16 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 		 */
 		if (should_dump)
 			ax_debug_dump_tree(focused_window, "focused_window");
+		if (window_bfs_deadline_ms > 0) {
+			uint64_t bfs_deadline_us =
+				get_time_us() + (uint64_t)window_bfs_deadline_ms * 1000;
+			ax_debug_log("\n--- PHASE 2.1: Window Content (BFS, %dms deadline) ---\n",
+				     window_bfs_deadline_ms);
+			collect_hints_bfs(focused_window, scr, NULL,
+					  hints, max_hints, &count, bfs_deadline_us);
+		}
 		collect_interactable_hints(focused_window, scr, NULL,
-				  hints, max_hints, &count, deadline_us);
+				  hints, max_hints, &count, deadline_us, visited);
 		CFRelease(focused_window);
 
 	} else {
@@ -1352,7 +1452,8 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 				if (should_dump)
 					ax_debug_dump_tree(window, "window");
 				collect_interactable_hints(window, scr, NULL,
-						  hints, max_hints, &count, deadline_us);
+						  hints, max_hints, &count,
+						  deadline_us, visited);
 			}
 
 			CFRelease(windows);
@@ -1369,11 +1470,15 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 			if (should_dump)
 				ax_debug_dump_tree(focused_element, "focused_element");
 			collect_interactable_hints(focused_element, scr, NULL,
-					  hints, max_hints, &count, deadline_us);
+					  hints, max_hints, &count,
+					  deadline_us, visited);
 			CFRelease(focused_element);
 		}
 
 	}
+
+	if (visited)
+		CFRelease(visited);
 
 	CFRelease(focused_app);
 

@@ -418,6 +418,11 @@ The fork uses macOS Accessibility API in two cases:
 - **Viewport-only exposure**: Even when enabled, Chrome only exposes elements currently visible in the viewport - this is an intentional performance optimization.
 - **Off-screen content missing**: Search result links, article links, and content below the fold are NOT exposed to the accessibility API.
 
+**Current Chromium status (find mode)**:
+- **Unreliable tree population**: AX elements sometimes remain empty until the page is interacted with (scroll, click, focus).
+- **Stale snapshots**: The AX tree can lag behind DOM updates, so hints may be missing or outdated.
+- **Viewport-only + lazy loading**: Infinite-scroll pages may show zero hints until content is scrolled into view.
+
 **Enabling Chrome Accessibility**:
 ```bash
 # Option 1: Command-line flag
@@ -458,10 +463,26 @@ This is a fundamental browser design decision. Screen readers navigate tabs usin
 
 **Electron Apps**:
 Electron apps require `AXManualAccessibility = true` attribute to expose their accessibility tree. Warpd automatically sets this for known Electron apps (VS Code, Discord, Slack, Spotify, Figma, Notion, Linear, Obsidian).
+Electron find mode depends on how the app exposes its accessibility tree:
+- Some apps disable renderer accessibility (cannot be forced externally)
+- Some populate the tree only after focus/interaction
+- Many expose only the viewport, similar to Chrome/Chromium
+
+**Electron troubleshooting**:
+- Try launching the app with `--force-renderer-accessibility`
+- If the app supports it, enable accessibility in its settings
+- If hints are empty, click inside the app, scroll a little, then retry find mode
+
+**Electron accessibility (official docs)**:
+- Electron auto-enables accessibility when it detects assistive tech (VoiceOver/JAWS)
+- Apps can force-enable via `app.setAccessibilitySupportEnabled(true)`
+- System assistive utilities take priority and can override the app setting
+- External tools (like warpd) can toggle `AXManualAccessibility` for a running app
 
 **Research Keywords**:
 - `AXEnhancedUserInterface` - attribute to enable Chrome/Chromium accessibility
 - `AXManualAccessibility` - attribute to enable Electron app accessibility
+- `app.setAccessibilitySupportEnabled` - Electron API to force accessibility on
 - `AXTabs` - accessibility attribute for window tabs (not used by browsers)
 - `AXTabGroup` - accessibility role for tab containers
 - `AXFrame` - alternative frame attribute for some elements
@@ -469,6 +490,7 @@ Electron apps require `AXManualAccessibility = true` attribute to expose their a
 - `chrome://accessibility` - Chrome's accessibility settings page
 - `accessibility.force_disabled` - Firefox about:config preference
 - `NSAccessibility` / `AXUIElement` - macOS accessibility framework
+ - `--force-renderer-accessibility` - Chromium flag (also works for many Electron apps)
 
 **Debugging Find Mode**:
 ```bash
@@ -483,6 +505,12 @@ env WARPD_AX_DUMP=1 ./bin/warpd
 
 # Optional: override dump depth/node budget
 # env WARPD_AX_DUMP=1 WARPD_AX_DEBUG_DEPTH=12 WARPD_AX_DEBUG_NODES=800 ./bin/warpd
+
+# Optional: tune deadlines and de-dup tolerance (macOS)
+# env WARPD_AX_MENU_DEADLINE_MS=150 ./bin/warpd
+# env WARPD_AX_WINDOW_DEADLINE_MS=1200 ./bin/warpd
+# env WARPD_AX_WINDOW_BFS_DEADLINE_MS=250 ./bin/warpd
+# env WARPD_AX_DEDUP_PX=3 ./bin/warpd
 
 # Check the log
 cat /tmp/warpd_ax_debug.log
