@@ -438,8 +438,17 @@ void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 		CGPoint pos = CGPointZero;
 		CGSize size = CGSizeZero;
 		if (ax_get_position_size(element, &pos, &size)) {
-			if (size.width <= 0 || size.height <= 0)
+			if (size.width <= 0 || size.height <= 0) {
 				should_traverse = 0;
+			} else {
+				float right = pos.x + size.width;
+				float top = pos.y + size.height;
+				float scr_right = scr->x + scr->w;
+				float scr_top = scr->y + scr->h;
+				if (right < scr->x || pos.x > scr_right ||
+				    top < scr->y || pos.y > scr_top)
+					should_traverse = 0;
+			}
 		}
 	}
 

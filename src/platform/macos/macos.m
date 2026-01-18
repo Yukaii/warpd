@@ -352,6 +352,7 @@ static int enable_app_accessibility(AXUIElementRef app)
 		flags |= APP_FLAG_ELECTRON;
 	}
 
+
 	if (is_chromium || is_electron || is_cef) {
 		ax_debug_log("Accessibility attributes set for: %s\n",
 			[bundleId UTF8String]);
@@ -784,9 +785,10 @@ static AXUIElementRef find_open_menu_bar_item(AXUIElementRef app)
 }
 
 static size_t collect_window_phase(AXUIElementRef focused_app, struct screen *scr,
-				   struct hint *hints, size_t max_hints,
-				   size_t count, int is_electron,
-				   int should_dump)
+			   struct hint *hints, size_t max_hints,
+			   size_t count, int is_electron,
+			   int should_dump)
+
 {
 	AXError error;
 	AXUIElementRef focused_element = NULL;
@@ -802,9 +804,10 @@ static size_t collect_window_phase(AXUIElementRef focused_app, struct screen *sc
 	 * DFS works better for deep trees like web content.
 	 */
 	int window_deadline_ms = ax_env_int("WARPD_AX_WINDOW_DEADLINE_MS",
-					    is_electron ? 1500 : 500);
+						is_electron ? 1500 : 300);
 	int window_bfs_deadline_ms = ax_env_int("WARPD_AX_WINDOW_BFS_DEADLINE_MS",
-						is_electron ? 0 : 250);
+						is_electron ? 0 : 0);
+
 	uint64_t deadline_us =
 		get_time_us() + (uint64_t)window_deadline_ms * 1000;
 
