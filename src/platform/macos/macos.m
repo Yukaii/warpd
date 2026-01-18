@@ -849,235 +849,6 @@ static void collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 	}
 }
 
-static void collect_menu_hints_with_poll(AXUIElementRef menu_root,
-					 struct screen *scr,
-					 struct hint *hints, size_t max_hints,
-					 size_t *count, uint64_t deadline_us)
-{
-	int poll_ms = ax_env_int("WARPD_AX_MENU_POLL_MS", 200);
-	int poll_interval_ms = ax_env_int("WARPD_AX_MENU_POLL_INTERVAL_MS", 30);
-	int stable_runs_needed = ax_env_int("WARPD_AX_MENU_STABLE_RUNS", 2);
-	int min_runs = ax_env_int("WARPD_AX_MENU_POLL_MIN_RUNS", 2);
-	uint64_t poll_deadline_us =
-		get_time_us() + (uint64_t)poll_ms * 1000;
-	int stable_runs = 0;
-	int runs = 0;
-	size_t last_temp_count = 0;
-	size_t base_count = *count;
-	size_t best_count = *count;
-	struct hint *base_hints = NULL;
-	struct hint *best_hints = NULL;
-	struct hint *temp_hints = NULL;
-	CGRect menu_frame = CGRectZero;
-	const CGRect *menu_frame_ptr = NULL;
-
-	if (!menu_root)
-		return;
-
-	if (ax_get_position_size(menu_root, &menu_frame.origin,
-				 &menu_frame.size) &&
-	    menu_frame.size.width >= 20 &&
-	    menu_frame.size.height >= 20)
-		menu_frame_ptr = &menu_frame;
-
-	if (base_count >= max_hints)
-		return;
-
-	if (poll_deadline_us > deadline_us)
-		poll_deadline_us = deadline_us;
-
-	base_hints = ax_alloc_hints(max_hints);
-	best_hints = ax_alloc_hints(max_hints);
-	temp_hints = ax_alloc_hints(max_hints);
-	if (!base_hints || !best_hints || !temp_hints) {
-		free(base_hints);
-		free(best_hints);
-		free(temp_hints);
-		return;
-	}
-
-	memcpy(base_hints, hints, sizeof(struct hint) * base_count);
-	memcpy(best_hints, hints, sizeof(struct hint) * base_count);
-	last_temp_count = base_count;
-
-	while (get_time_us() < poll_deadline_us && *count < max_hints) {
-		size_t temp_count = base_count;
-
-		memcpy(temp_hints, base_hints, sizeof(struct hint) * base_count);
-		collect_hints_bfs(menu_root, scr, menu_frame_ptr, temp_hints, max_hints,
-				  &temp_count, deadline_us, 1, 1);
-
-		if (temp_count > best_count) {
-			memcpy(best_hints, temp_hints,
-			       sizeof(struct hint) * temp_count);
-			best_count = temp_count;
-		}
-
-		runs++;
-		if (temp_count == last_temp_count)
-			stable_runs++;
-		else
-			stable_runs = 0;
-		last_temp_count = temp_count;
-		if (runs >= min_runs && stable_runs >= stable_runs_needed)
-			break;
-
-		if (poll_interval_ms > 0)
-			usleep((useconds_t)poll_interval_ms * 1000);
-	}
-
-	memcpy(hints, best_hints, sizeof(struct hint) * best_count);
-	*count = best_count;
-	free(base_hints);
-	free(best_hints);
-	free(temp_hints);
-}
-
-static size_t collect_menu_hints_from_menu_bar(AXUIElementRef app,
-					       struct screen *scr,
-					       struct hint *base_hints,
-					       size_t base_count,
-					       size_t max_hints,
-					       struct hint *out_hints,
-					       uint64_t deadline_us)
-{
-	size_t best_count = 0;
-	NSPoint mouse_loc = [NSEvent mouseLocation];
-	double mouse_x = mouse_loc.x;
-	AXUIElementRef best_menu_item = NULL;
-	char best_menu_title[256];
-	best_menu_title[0] = 0;
-	int scan_result = AX_MENU_SCAN_OK;
-
-	if (!app || !base_hints || !out_hints)
-		return 0;
-
-	if (ax_debug_enabled()) {
-		ax_debug_log("MENU_SCAN start mouse_x=%.1f base_count=%zu deadline_us=%llu\n",
-			     mouse_x, base_count,
-			     (unsigned long long)deadline_us);
-	}
-
-	best_menu_item = ax_menu_bar_item_nearest(app, mouse_x, &scan_result);
-	if (!best_menu_item) {
-		if (ax_debug_enabled()) {
-			switch (scan_result) {
-			case AX_MENU_SCAN_NO_APP:
-				ax_debug_log("MENU_SCAN no_app\n");
-				break;
-			case AX_MENU_SCAN_NO_MENU_BAR:
-				ax_debug_log("MENU_SCAN menu_bar_missing\n");
-				break;
-			case AX_MENU_SCAN_NO_CHILDREN:
-				ax_debug_log("MENU_SCAN menu_bar_children_missing\n");
-				break;
-			case AX_MENU_SCAN_CHILDREN_BAD_TYPE:
-				ax_debug_log("MENU_SCAN menu_bar_children_not_array\n");
-				break;
-			case AX_MENU_SCAN_NO_ITEM:
-				ax_debug_log("MENU_SCAN no_best_menu_item\n");
-				break;
-			default:
-				ax_debug_log("MENU_SCAN no_best_menu_item\n");
-				break;
-			}
-		}
-		return 0;
-	}
-
-	ax_menu_bar_item_title(best_menu_item, best_menu_title,
-			       sizeof best_menu_title);
-
-	AXUIElementRef menu_root = ax_menu_root_from_menu_bar_item(best_menu_item);
-	if (!menu_root) {
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_OPEN target=\"%s\" initial_children=-1\n",
-				     best_menu_title);
-		int pressed = ax_press_menu_bar_item(best_menu_item);
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_OPEN attempt=1 pressed=%d children=-1\n",
-				     pressed);
-		if (pressed)
-			usleep(80 * 1000);
-		menu_root = ax_menu_root_from_menu_bar_item(best_menu_item);
-	}
-	if (!menu_root) {
-		CFRelease(best_menu_item);
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_SCAN menu_root_missing title=\"%s\"\n",
-				     best_menu_title);
-		return 0;
-	}
-
-	if (!ax_menu_root_matches_title(menu_root, best_menu_title)) {
-		CFRelease(menu_root);
-		CFRelease(best_menu_item);
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_SCAN menu_root_title_mismatch title=\"%s\"\n",
-				     best_menu_title);
-		return 0;
-	}
-
-	int menu_open_delay_ms =
-		ax_env_int("WARPD_AX_MENU_OPEN_DELAY_MS", 80);
-	int menu_open_retries =
-		ax_env_int("WARPD_AX_MENU_OPEN_RETRIES", 1);
-	if (ax_debug_enabled()) {
-		CFIndex initial_children =
-			ax_child_count(menu_root, kAXChildrenAttribute);
-		ax_debug_log("MENU_OPEN target=\"%s\" initial_children=%ld\n",
-			     best_menu_title, (long)initial_children);
-	}
-	for (int attempt = 0;
-	     attempt < menu_open_retries && !ax_menu_has_children(menu_root);
-	     attempt++) {
-		int pressed = ax_press_menu_bar_item(best_menu_item);
-		if (ax_debug_enabled()) {
-			CFIndex after_press =
-				ax_child_count(menu_root, kAXChildrenAttribute);
-			ax_debug_log("MENU_OPEN attempt=%d pressed=%d children=%ld\n",
-				     attempt + 1, pressed, (long)after_press);
-		}
-		if (!pressed)
-			break;
-		if (menu_open_delay_ms > 0)
-			usleep((useconds_t)menu_open_delay_ms * 1000);
-		if (!ax_menu_has_children(menu_root)) {
-			AXUIElementRef refreshed = NULL;
-			if (AXUIElementCopyAttributeValue(
-				    best_menu_item, ax_menu_attribute(),
-				    (CFTypeRef *)&refreshed) == kAXErrorSuccess &&
-			    refreshed) {
-				if (CFGetTypeID(refreshed) == AXUIElementGetTypeID()) {
-					CFRelease(menu_root);
-					menu_root = refreshed;
-				} else {
-					CFRelease(refreshed);
-				}
-			}
-		}
-	}
-
-	size_t temp_count = base_count;
-	struct hint *temp_hints = ax_alloc_hints(max_hints);
-	if (!temp_hints) {
-		CFRelease(menu_root);
-		CFRelease(best_menu_item);
-		return 0;
-	}
-	memcpy(temp_hints, base_hints, sizeof(struct hint) * base_count);
-	collect_menu_hints_with_poll(menu_root, scr, temp_hints, max_hints,
-				     &temp_count, deadline_us);
-
-	memcpy(out_hints, temp_hints, sizeof(struct hint) * temp_count);
-	best_count = temp_count;
-
-	free(temp_hints);
-	CFRelease(menu_root);
-	CFRelease(best_menu_item);
-	return best_count;
-}
-
 static size_t collect_menu_phase(AXUIElementRef focused_app, struct screen *scr,
 				 struct hint *hints, size_t max_hints,
 				 int is_electron, int should_dump)
@@ -1213,10 +984,10 @@ static size_t collect_menu_phase(AXUIElementRef focused_app, struct screen *scr,
 								  "menu_root_focus_direct" : "menu_root");
 					memcpy(local_hints, menu_bar_hints,
 					       sizeof(struct hint) * menu_bar_count);
-					collect_menu_hints_with_poll(temp_menu_root, scr,
-								     local_hints, max_hints,
-								     &local_count,
-								     menu_deadline_us);
+					ax_collect_menu_hints_with_poll(
+					    temp_menu_root, scr, local_hints, max_hints,
+					    &local_count, menu_deadline_us,
+					    collect_hints_bfs);
 					if (local_count >= candidate_count) {
 						memcpy(candidate_hints, local_hints,
 						       sizeof(struct hint) * local_count);
@@ -1279,10 +1050,10 @@ static size_t collect_menu_phase(AXUIElementRef focused_app, struct screen *scr,
 									  "menu_root_system");
 						memcpy(local_hints, menu_bar_hints,
 						       sizeof(struct hint) * menu_bar_count);
-						collect_menu_hints_with_poll(sys_menu_root, scr,
-									     local_hints, max_hints,
-									     &local_count,
-									     menu_deadline_us);
+						ax_collect_menu_hints_with_poll(
+						    sys_menu_root, scr, local_hints, max_hints,
+						    &local_count, menu_deadline_us,
+						    collect_hints_bfs);
 						if (local_count > candidate_count) {
 							memcpy(candidate_hints, local_hints,
 							       sizeof(struct hint) * local_count);
@@ -1300,9 +1071,10 @@ static size_t collect_menu_phase(AXUIElementRef focused_app, struct screen *scr,
 		}
 
 		if (get_time_us() < menu_deadline_us) {
-			bar_candidate_count = collect_menu_hints_from_menu_bar(
+			bar_candidate_count = ax_collect_menu_hints_from_menu_bar(
 				focused_app, scr, menu_bar_hints, menu_bar_count,
-				max_hints, bar_candidate_hints, menu_deadline_us);
+				max_hints, bar_candidate_hints, menu_deadline_us,
+				collect_hints_bfs);
 			if (bar_candidate_count > 0) {
 				saw_menu = 1;
 				if (bar_candidate_count > candidate_count) {
