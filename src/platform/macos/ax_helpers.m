@@ -266,3 +266,22 @@ int ax_get_position_size(AXUIElementRef element, CGPoint *position,
 
 	return 0;
 }
+
+int ax_env_int(const char *name, int default_value)
+{
+	const char *val = getenv(name);
+	char *end = NULL;
+	long parsed;
+
+	if (!val || !val[0])
+		return default_value;
+
+	parsed = strtol(val, &end, 10);
+	if (end == val || parsed < 0)
+		return default_value;
+
+	if (parsed > INT_MAX)
+		return default_value;
+
+	return (int)parsed;
+}

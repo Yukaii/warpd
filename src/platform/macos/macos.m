@@ -8,8 +8,6 @@
 #include "ax_helpers.h"
 #include "ax_menu.h"
 #include "ax_debug.h"
-#include <limits.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -637,44 +635,6 @@ static int ax_element_is_interactable(AXUIElementRef element)
 	return 1;
 }
 
-static int ax_element_center_for_screen(AXUIElementRef element, struct screen *scr,
-					const CGRect *window_frame,
-					int *center_x, int *center_y)
-{
-	CGPoint position = CGPointZero;
-	CGSize size = CGSizeZero;
-	float local_x;
-	float local_y;
-
-	if (!ax_get_position_size(element, &position, &size))
-		return 0;
-
-	if (size.width <= 0 || size.height <= 0)
-		return 0;
-
-	float global_x = position.x + size.width / 2.0f;
-	float global_y = position.y + size.height / 2.0f;
-
-	if (window_frame) {
-		if (global_x < window_frame->origin.x ||
-		    global_x > (window_frame->origin.x + window_frame->size.width) ||
-		    global_y < window_frame->origin.y ||
-		    global_y > (window_frame->origin.y + window_frame->size.height))
-			return 0;
-	}
-
-	if (global_x < scr->x || global_x > (scr->x + scr->w) ||
-	    global_y < scr->y || global_y > (scr->y + scr->h))
-		return 0;
-
-	local_x = global_x - scr->x;
-	local_y = global_y - scr->y;
-
-	*center_x = (int)lroundf(local_x);
-	*center_y = (int)lroundf(local_y);
-	return 1;
-}
-
 static void collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 					const CGRect *window_frame,
 					struct hint *hints,
@@ -724,42 +684,6 @@ static void collect_interactable_children(AXUIElementRef element,
 	CFRelease(children);
 }
 
-static int ax_env_int(const char *name, int default_value)
-{
-	const char *val = getenv(name);
-	char *end = NULL;
-	long parsed;
-
-	if (!val || !val[0])
-		return default_value;
-
-	parsed = strtol(val, &end, 10);
-	if (end == val || parsed < 0)
-		return default_value;
-
-	if (parsed > INT_MAX)
-		return default_value;
-
-	return (int)parsed;
-}
-
-/* Check if a hint already exists at or near the given position */
-static int hint_position_exists(struct hint *hints, size_t count, int x, int y)
-{
-	/* Use a small tolerance to avoid near-duplicates */
-	int tolerance = ax_env_int("WARPD_AX_DEDUP_PX", 5);
-	if (tolerance < 0)
-		tolerance = 0;
-	for (size_t i = 0; i < count; i++) {
-		int dx = hints[i].x - x;
-		int dy = hints[i].y - y;
-		if (dx >= -tolerance && dx <= tolerance &&
-		    dy >= -tolerance && dy <= tolerance)
-			return 1;
-	}
-	return 0;
-}
-
 static void collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 					const CGRect *window_frame,
 					struct hint *hints,
@@ -792,7 +716,7 @@ static void collect_interactable_hints(AXUIElementRef element, struct screen *sc
 
 		if (ax_element_center_for_screen(element, scr, window_frame, &x, &y)) {
 			/* Skip duplicate positions */
-			if (hint_position_exists(hints, *count, x, y)) {
+			if (ax_hint_position_exists(hints, *count, x, y)) {
 				ax_debug_log_element(element, "DUP", x, y);
 			} else {
 				hints[*count].x = x;
@@ -872,7 +796,7 @@ static void collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 				if (ax_element_center_for_screen(element, scr, window_frame,
 								 &x, &y)) {
 					/* Skip duplicate positions */
-					if (hint_position_exists(hints, *count, x, y)) {
+					if (ax_hint_position_exists(hints, *count, x, y)) {
 						ax_debug_log_element(element, "MENU_DUP", x, y);
 					} else {
 						hints[*count].x = x;
@@ -930,64 +854,6 @@ static void collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 	while (queue_head < queue_tail) {
 		CFRelease(queue[queue_head++]);
 	}
-}
-
-static void collect_menu_bar_hints(AXUIElementRef menu_bar, struct screen *scr,
-				   struct hint *hints, size_t max_hints,
-				   size_t *count, uint64_t deadline_us)
-{
-	CFArrayRef children = NULL;
-
-	if (!menu_bar || *count >= max_hints)
-		return;
-
-	children = ax_copy_child_array(menu_bar, kAXChildrenAttribute);
-	if (!children)
-		return;
-
-	CFIndex child_count = CFArrayGetCount(children);
-	for (CFIndex i = 0; i < child_count && *count < max_hints; i++) {
-		if (deadline_us > 0 && get_time_us() >= deadline_us)
-			break;
-
-		CFTypeRef child_ref = CFArrayGetValueAtIndex(children, i);
-		if (!child_ref || CFGetTypeID(child_ref) != AXUIElementGetTypeID())
-			continue;
-
-		AXUIElementRef menu_item = (AXUIElementRef)child_ref;
-		CFTypeRef role = NULL;
-		int is_menu_bar_item = 0;
-		int x = 0;
-		int y = 0;
-
-		if (AXUIElementCopyAttributeValue(menu_item, kAXRoleAttribute,
-						  &role) == kAXErrorSuccess &&
-		    role) {
-			if (CFGetTypeID(role) == CFStringGetTypeID())
-				is_menu_bar_item =
-					CFEqual((CFStringRef)role,
-						ax_menu_bar_item_role());
-			CFRelease(role);
-		}
-
-		if (!is_menu_bar_item)
-			continue;
-
-		if (!ax_element_center_for_screen(menu_item, scr, NULL, &x, &y))
-			continue;
-
-		if (hint_position_exists(hints, *count, x, y)) {
-			ax_debug_log_element(menu_item, "MENU_BAR_DUP", x, y);
-			continue;
-		}
-
-		hints[*count].x = x;
-		hints[*count].y = y;
-		(*count)++;
-		ax_debug_log_element(menu_item, "MENU_BAR", x, y);
-	}
-
-	CFRelease(children);
 }
 
 static void collect_menu_hints_with_poll(AXUIElementRef menu_root,
@@ -1248,8 +1114,8 @@ static size_t collect_menu_phase(AXUIElementRef focused_app, struct screen *scr,
 	    menu_bar) {
 		if (should_dump)
 			ax_debug_dump_tree(menu_bar, "app_menu_bar");
-		collect_menu_bar_hints(menu_bar, scr, hints, max_hints, &count,
-				       menu_bar_deadline_us);
+		ax_collect_menu_bar_hints(menu_bar, scr, hints, max_hints, &count,
+					  menu_bar_deadline_us);
 		CFRelease(menu_bar);
 	}
 
@@ -1263,8 +1129,8 @@ static size_t collect_menu_phase(AXUIElementRef focused_app, struct screen *scr,
 			    menu_bar) {
 				if (should_dump)
 					ax_debug_dump_tree(menu_bar, "system_menu_bar");
-				collect_menu_bar_hints(menu_bar, scr, hints, max_hints,
-						       &count, menu_bar_deadline_us);
+				ax_collect_menu_bar_hints(menu_bar, scr, hints, max_hints,
+							  &count, menu_bar_deadline_us);
 				CFRelease(menu_bar);
 			}
 			CFRelease(system);

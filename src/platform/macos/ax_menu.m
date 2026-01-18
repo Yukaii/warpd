@@ -5,10 +5,16 @@
  */
 
 #include "ax_menu.h"
+#include "ax_debug.h"
 #include "ax_helpers.h"
+#include "macos.h"
 #include <ctype.h>
 #include <string.h>
 #include <float.h>
+#include <math.h>
+
+/* Declare get_time_us from warpd.c - avoid including warpd.h */
+extern uint64_t get_time_us(void);
 
 int ax_menu_bar_item_title(AXUIElementRef element, char *out, size_t out_len)
 {
@@ -249,6 +255,118 @@ int ax_press_menu_bar_item(AXUIElementRef element)
 
 	err = AXUIElementPerformAction(element, kAXShowMenuAction);
 	return err == kAXErrorSuccess;
+}
+
+int ax_hint_position_exists(struct hint *hints, size_t count, int x, int y)
+{
+	/* Use a small tolerance to avoid near-duplicates */
+	int tolerance = ax_env_int("WARPD_AX_DEDUP_PX", 5);
+	if (tolerance < 0)
+		tolerance = 0;
+	for (size_t i = 0; i < count; i++) {
+		int dx = hints[i].x - x;
+		int dy = hints[i].y - y;
+		if (dx >= -tolerance && dx <= tolerance &&
+		    dy >= -tolerance && dy <= tolerance)
+			return 1;
+	}
+	return 0;
+}
+
+int ax_element_center_for_screen(AXUIElementRef element, struct screen *scr,
+				 const CGRect *window_frame,
+				 int *center_x, int *center_y)
+{
+	CGPoint position = CGPointZero;
+	CGSize size = CGSizeZero;
+	float local_x;
+	float local_y;
+
+	if (!ax_get_position_size(element, &position, &size))
+		return 0;
+
+	if (size.width <= 0 || size.height <= 0)
+		return 0;
+
+	float global_x = position.x + size.width / 2.0f;
+	float global_y = position.y + size.height / 2.0f;
+
+	if (window_frame) {
+		if (global_x < window_frame->origin.x ||
+		    global_x > (window_frame->origin.x + window_frame->size.width) ||
+		    global_y < window_frame->origin.y ||
+		    global_y > (window_frame->origin.y + window_frame->size.height))
+			return 0;
+	}
+
+	if (global_x < scr->x || global_x > (scr->x + scr->w) ||
+	    global_y < scr->y || global_y > (scr->y + scr->h))
+		return 0;
+
+	local_x = global_x - scr->x;
+	local_y = global_y - scr->y;
+
+	*center_x = (int)lroundf(local_x);
+	*center_y = (int)lroundf(local_y);
+	return 1;
+}
+
+void ax_collect_menu_bar_hints(AXUIElementRef menu_bar, struct screen *scr,
+			       struct hint *hints, size_t max_hints,
+			       size_t *count, uint64_t deadline_us)
+{
+	CFArrayRef children = NULL;
+
+	if (!menu_bar || *count >= max_hints)
+		return;
+
+	children = ax_copy_child_array(menu_bar, kAXChildrenAttribute);
+	if (!children)
+		return;
+
+	CFIndex child_count = CFArrayGetCount(children);
+	for (CFIndex i = 0; i < child_count && *count < max_hints; i++) {
+		if (deadline_us > 0 && get_time_us() >= deadline_us)
+			break;
+
+		CFTypeRef child_ref = CFArrayGetValueAtIndex(children, i);
+		if (!child_ref || CFGetTypeID(child_ref) != AXUIElementGetTypeID())
+			continue;
+
+		AXUIElementRef menu_item = (AXUIElementRef)child_ref;
+		CFTypeRef role = NULL;
+		int is_menu_bar_item = 0;
+		int x = 0;
+		int y = 0;
+
+		if (AXUIElementCopyAttributeValue(menu_item, kAXRoleAttribute,
+						  &role) == kAXErrorSuccess &&
+		    role) {
+			if (CFGetTypeID(role) == CFStringGetTypeID())
+				is_menu_bar_item =
+					CFEqual((CFStringRef)role,
+						ax_menu_bar_item_role());
+			CFRelease(role);
+		}
+
+		if (!is_menu_bar_item)
+			continue;
+
+		if (!ax_element_center_for_screen(menu_item, scr, NULL, &x, &y))
+			continue;
+
+		if (ax_hint_position_exists(hints, *count, x, y)) {
+			ax_debug_log_element(menu_item, "MENU_BAR_DUP", x, y);
+			continue;
+		}
+
+		hints[*count].x = x;
+		hints[*count].y = y;
+		(*count)++;
+		ax_debug_log_element(menu_item, "MENU_BAR", x, y);
+	}
+
+	CFRelease(children);
 }
 
 AXUIElementRef ax_menu_bar_item_nearest(AXUIElementRef app, double mouse_x,

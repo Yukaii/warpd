@@ -33,5 +33,6 @@ CFArrayRef ax_copy_child_array(AXUIElementRef element, CFStringRef attr);
 CFIndex ax_child_count(AXUIElementRef element, CFStringRef attr);
 int ax_get_position_size(AXUIElementRef element, CGPoint *position,
 			 CGSize *size);
+int ax_env_int(const char *name, int default_value);
 
 #endif

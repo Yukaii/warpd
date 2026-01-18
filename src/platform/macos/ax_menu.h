@@ -7,6 +7,7 @@
 #ifndef WARPED_AX_MENU_H
 #define WARPED_AX_MENU_H
 
+#include "../../platform.h"
 #include <ApplicationServices/ApplicationServices.h>
 
 int ax_menu_bar_item_title(AXUIElementRef element, char *out, size_t out_len);
@@ -17,6 +18,13 @@ AXUIElementRef ax_menu_root_from_menu_bar_item(AXUIElementRef element);
 AXUIElementRef ax_menu_root_for_element(AXUIElementRef element);
 AXUIElementRef ax_menu_from_menu_bar_item(AXUIElementRef element);
 int ax_press_menu_bar_item(AXUIElementRef element);
+int ax_hint_position_exists(struct hint *hints, size_t count, int x, int y);
+int ax_element_center_for_screen(AXUIElementRef element, struct screen *scr,
+				 const CGRect *window_frame,
+				 int *center_x, int *center_y);
+void ax_collect_menu_bar_hints(AXUIElementRef menu_bar, struct screen *scr,
+			       struct hint *hints, size_t max_hints,
+			       size_t *count, uint64_t deadline_us);
 
 enum ax_menu_scan_result {
 	AX_MENU_SCAN_OK = 0,
