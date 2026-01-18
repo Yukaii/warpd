@@ -7,6 +7,7 @@
 #ifndef WARPED_AX_HELPERS_H
 #define WARPED_AX_HELPERS_H
 
+#include "../../platform.h"
 #include <ApplicationServices/ApplicationServices.h>
 
 CFStringRef ax_link_role(void);
@@ -34,5 +35,6 @@ CFIndex ax_child_count(AXUIElementRef element, CFStringRef attr);
 int ax_get_position_size(AXUIElementRef element, CGPoint *position,
 			 CGSize *size);
 int ax_env_int(const char *name, int default_value);
+struct hint *ax_alloc_hints(size_t max_hints);
 
 #endif

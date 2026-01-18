@@ -430,13 +430,6 @@ static int ax_actions_match(CFArrayRef actions)
 
 static int ax_element_supports_action(AXUIElementRef element);
 
-static struct hint *ax_alloc_hints(size_t max_hints)
-{
-	if (max_hints == 0)
-		return NULL;
-	return malloc(sizeof(struct hint) * max_hints);
-}
-
 static int ax_parent_is_actionable(AXUIElementRef element)
 {
 	AXUIElementRef parent = NULL;

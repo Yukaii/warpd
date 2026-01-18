@@ -9,9 +9,11 @@
 #include "ax_helpers.h"
 #include "macos.h"
 #include <ctype.h>
-#include <string.h>
 #include <float.h>
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /* Declare get_time_us from warpd.c - avoid including warpd.h */
 extern uint64_t get_time_us(void);

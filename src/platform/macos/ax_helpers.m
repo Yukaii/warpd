@@ -285,3 +285,10 @@ int ax_env_int(const char *name, int default_value)
 
 	return (int)parsed;
 }
+
+struct hint *ax_alloc_hints(size_t max_hints)
+{
+	if (max_hints == 0)
+		return NULL;
+	return malloc(sizeof(struct hint) * max_hints);
+}
