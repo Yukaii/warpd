@@ -902,6 +902,8 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 
 	size_t count = 0;
 	int should_dump = ax_debug_dump_enabled();
+	uint64_t start_us = get_time_us();
+	uint64_t menu_start_us = start_us;
 
 	/*
 	 * Scan menu bars FIRST using BFS - this ensures we get all top-level
@@ -909,16 +911,26 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 	 */
 	count = collect_menu_phase(focused_app, scr, hints, max_hints,
 				   is_electron, should_dump);
+	uint64_t menu_end_us = get_time_us();
+	ax_debug_log("=== Phase timing: menu=%llums ===\n",
+		     (unsigned long long)((menu_end_us - menu_start_us) / 1000));
 
+	uint64_t window_start_us = get_time_us();
 	count = collect_window_phase(focused_app, scr, hints, max_hints, count,
-				     is_electron, should_dump);
+			     is_electron, should_dump);
+	uint64_t window_end_us = get_time_us();
+	ax_debug_log("=== Phase timing: window=%llums ===\n",
+		     (unsigned long long)((window_end_us - window_start_us) / 1000));
 
 	CFRelease(focused_app);
 
-	ax_debug_log("=== Hint collection complete: %zu hints found ===\n\n", count);
+	ax_debug_log("=== Hint collection complete: %zu hints found ===\n", count);
+	ax_debug_log("=== Total timing: %llums ===\n\n",
+		     (unsigned long long)((get_time_us() - start_us) / 1000));
 	ax_debug_close();
 
 	return count;
+
 }
 
 void osx_scroll(int direction)
