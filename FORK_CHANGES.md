@@ -79,6 +79,98 @@ Modified `input_parse_string()` in `src/input.c` to use QWERTY-based lookup for 
 - `src/platform/macos/mouse.m`
 - `src/platform/macos/macos.h`
 
+### 6. Scrolling enhancements (`c9f47b0`, `c6f7705`, `050a4a9`)
+
+**Additions:**
+- Horizontal scrolling controls and bindings
+- Page up/down scrolling via large scroll events
+- Home/end scrolling on macOS implemented via key emulation for reliability
+
+**Files modified:**
+- `src/scroll.c`
+- `src/config.c`
+- `src/input.c`
+- `src/platform/macos/input.m`
+- `src/platform/macos/macos.m`
+- `src/platform/linux/X/X.c`
+- `src/platform/linux/wayland/wayland.c`
+
+### 7. Visual feedback (ripples + cursor effects) (`a10bd89`, `485b0d2`, `63c3c5c`)
+
+**Additions:**
+- Ripple animation on clicks and jump commands
+- Extra visual feedback for warp/jump actions
+- Cursor entry pulse effect when entering normal mode (macOS)
+
+**Files modified:**
+- `src/platform/macos/macos.m`
+- `src/normal.c`
+- `src/grid.c`
+- `src/hint.c`
+- `src/mode-loop.c`
+- `src/config.c`
+
+### 8. Cursor customization (macOS) (`45e1375`)
+
+**Additions:**
+- Support for system cursor packs and custom cursor files
+- Optional cursor halo and entry pulse when using non-default cursors
+
+**Files modified:**
+- `src/platform/macos/mouse.m`
+- `src/platform/macos/macos.m`
+- `src/config.c`
+
+### 9. Input and mode behavior (`dd856c9`, `afe291f`, `8ad5e4d`)
+
+**Additions:**
+- Hold mouse buttons while key is held (`hold_buttons`)
+- Rapid auto-click mode with configurable interval
+- Fix history updates when enabling hold buttons
+
+**Files modified:**
+- `src/config.c`
+- `src/input.c`
+- `src/normal.c`
+- `src/mode-loop.c`
+- `src/mouse.c`
+
+### 10. Hint customization (`49b3cc2`, `a62b3f8`)
+
+**Additions:**
+- Configurable hint appearance (colors, size, border radius)
+- Monospace font default for clearer label rendering
+
+**Files modified:**
+- `src/config.c`
+- `src/platform/macos/macos.m`
+- `src/platform/linux/X/X.c`
+- `src/platform/linux/wayland/wayland.c`
+
+### 11. Find mode (macOS) and accessibility improvements (`199114e` .. `3607e9e`)
+
+**Additions:**
+- New find mode (`Alt-Cmd-f`) that hints interactable UI elements in the frontmost app
+- Accessibility-based traversal of windows, menus, and controls
+- Chrome/Electron-specific handling and stability/performance improvements
+
+**Files modified:**
+- `src/platform/macos/macos.m`
+- `src/platform/macos/ax_helpers.m`
+- `src/platform/macos/ax_menu.m`
+- `src/hint.c`
+- `src/mode-loop.c`
+
+### 12. macOS behavior fixes (`398ec37`, `0d067c9`)
+
+**Fixes:**
+- Preserve modifier mouse interactions on macOS
+- Improve edge-push behavior for auto-hiding Dock/menu bar
+
+**Files modified:**
+- `src/platform/macos/mouse.m`
+- `src/mouse.c`
+
 ## Compatibility
 
 These changes are backward compatible:
