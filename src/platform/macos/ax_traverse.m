@@ -480,6 +480,13 @@ void ax_collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 							queue[queue_tail++] = (AXUIElementRef)child_ref;
 						}
 					}
+				} else if (CFGetTypeID(children_ref) ==
+					   AXUIElementGetTypeID()) {
+					if (queue_tail < BFS_QUEUE_SIZE) {
+						CFRetain(children_ref);
+						queue[queue_tail++] =
+							(AXUIElementRef)children_ref;
+					}
 				}
 				CFRelease(children_ref);
 			}

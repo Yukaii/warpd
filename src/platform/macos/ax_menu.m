@@ -127,6 +127,42 @@ int ax_menu_has_children(AXUIElementRef menu)
 	return count > 0;
 }
 
+static int ax_menu_has_visible_children(AXUIElementRef menu)
+{
+	CFTypeRef children_ref = NULL;
+	int visible = 0;
+
+	if (!menu)
+		return 0;
+
+	if (AXUIElementCopyAttributeValue(menu, kAXChildrenAttribute,
+					  &children_ref) != kAXErrorSuccess ||
+	    !children_ref)
+		return 0;
+
+	if (CFGetTypeID(children_ref) == CFArrayGetTypeID()) {
+		CFArrayRef children = (CFArrayRef)children_ref;
+		CFIndex count = CFArrayGetCount(children);
+		for (CFIndex i = 0; i < count; i++) {
+			CFTypeRef child_ref = CFArrayGetValueAtIndex(children, i);
+			if (!child_ref ||
+			    CFGetTypeID(child_ref) != AXUIElementGetTypeID())
+				continue;
+			AXUIElementRef child = (AXUIElementRef)child_ref;
+			CGPoint position = CGPointZero;
+			CGSize size = CGSizeZero;
+			if (ax_get_position_size(child, &position, &size) &&
+			    size.width > 0 && size.height > 0) {
+				visible = 1;
+				break;
+			}
+		}
+	}
+
+	CFRelease(children_ref);
+	return visible;
+}
+
 AXUIElementRef ax_menu_root_from_menu_bar_item(AXUIElementRef element)
 {
 	AXUIElementRef menu_root = NULL;
@@ -393,11 +429,13 @@ void ax_collect_menu_hints_with_poll(AXUIElementRef menu_root,
 	struct hint *temp_hints = NULL;
 	CGRect menu_frame = CGRectZero;
 	const CGRect *menu_frame_ptr = NULL;
+	int clip_to_menu_frame = ax_env_int("WARPD_AX_MENU_CLIP_FRAME", 0);
 
 	if (!menu_root || !collect_bfs)
 		return;
 
-	if (ax_get_position_size(menu_root, &menu_frame.origin,
+	if (clip_to_menu_frame > 0 &&
+	    ax_get_position_size(menu_root, &menu_frame.origin,
 				 &menu_frame.size) &&
 	    menu_frame.size.width >= 20 &&
 	    menu_frame.size.height >= 20)
@@ -472,6 +510,7 @@ size_t ax_collect_menu_hints_from_menu_bar(AXUIElementRef app,
 	char best_menu_title[256];
 	best_menu_title[0] = 0;
 	int scan_result = AX_MENU_SCAN_OK;
+	int allow_auto_open = ax_env_int("WARPD_AX_MENU_AUTO_OPEN", 0);
 
 	if (!app || !base_hints || !out_hints)
 		return 0;
@@ -514,6 +553,10 @@ size_t ax_collect_menu_hints_from_menu_bar(AXUIElementRef app,
 
 	AXUIElementRef menu_root = ax_menu_root_from_menu_bar_item(best_menu_item);
 	if (!menu_root) {
+		if (!allow_auto_open) {
+			CFRelease(best_menu_item);
+			return 0;
+		}
 		if (ax_debug_enabled())
 			ax_debug_log("MENU_OPEN target=\"%s\" initial_children=-1\n",
 				     best_menu_title);
@@ -549,24 +592,37 @@ size_t ax_collect_menu_hints_from_menu_bar(AXUIElementRef app,
 	if (ax_debug_enabled()) {
 		CFIndex initial_children =
 			ax_child_count(menu_root, kAXChildrenAttribute);
+		int initial_visible = ax_menu_has_visible_children(menu_root);
 		ax_debug_log("MENU_OPEN target=\"%s\" initial_children=%ld\n",
 			     best_menu_title, (long)initial_children);
+		if (!initial_visible)
+			ax_debug_log("MENU_OPEN target=\"%s\" visible_children=0\n",
+				     best_menu_title);
 	}
 	for (int attempt = 0;
-	     attempt < menu_open_retries && !ax_menu_has_children(menu_root);
+	     attempt < menu_open_retries &&
+	     (!ax_menu_has_children(menu_root) ||
+	      !ax_menu_has_visible_children(menu_root));
 	     attempt++) {
+		if (!allow_auto_open)
+			break;
 		int pressed = ax_press_menu_bar_item(best_menu_item);
 		if (ax_debug_enabled()) {
 			CFIndex after_press =
 				ax_child_count(menu_root, kAXChildrenAttribute);
+			int visible_after = ax_menu_has_visible_children(menu_root);
 			ax_debug_log("MENU_OPEN attempt=%d pressed=%d children=%ld\n",
 				     attempt + 1, pressed, (long)after_press);
+			if (!visible_after)
+				ax_debug_log("MENU_OPEN attempt=%d visible_children=0\n",
+					     attempt + 1);
 		}
 		if (!pressed)
 			break;
 		if (menu_open_delay_ms > 0)
 			usleep((useconds_t)menu_open_delay_ms * 1000);
-		if (!ax_menu_has_children(menu_root)) {
+		if (!ax_menu_has_children(menu_root) ||
+		    !ax_menu_has_visible_children(menu_root)) {
 			AXUIElementRef refreshed = NULL;
 			if (AXUIElementCopyAttributeValue(
 				    best_menu_item, ax_menu_attribute(),
