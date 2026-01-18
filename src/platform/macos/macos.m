@@ -804,7 +804,7 @@ static size_t collect_window_phase(AXUIElementRef focused_app, struct screen *sc
 	int window_deadline_ms = ax_env_int("WARPD_AX_WINDOW_DEADLINE_MS",
 					    is_electron ? 1500 : 500);
 	int window_bfs_deadline_ms = ax_env_int("WARPD_AX_WINDOW_BFS_DEADLINE_MS",
-						is_electron ? 250 : 0);
+						is_electron ? 0 : 250);
 	uint64_t deadline_us =
 		get_time_us() + (uint64_t)window_deadline_ms * 1000;
 
