@@ -5,6 +5,7 @@
  */
 
 #include "macos.h"
+#include "ax_helpers.h"
 #include <limits.h>
 #include <math.h>
 #include <stdarg.h>
@@ -372,140 +373,6 @@ void osx_copy_selection()
 	send_key(9, 0);   /* 'c' up */
 }
 
-static int ax_get_bool_attr(AXUIElementRef element, CFStringRef attr, int *value)
-{
-	CFTypeRef raw = NULL;
-	AXError error;
-
-	if (!element)
-		return 0;
-
-	error = AXUIElementCopyAttributeValue(element, attr, &raw);
-
-	if (error != kAXErrorSuccess || !raw)
-		return 0;
-
-	if (CFGetTypeID(raw) == CFBooleanGetTypeID()) {
-		*value = CFBooleanGetValue((CFBooleanRef)raw);
-		CFRelease(raw);
-		return 1;
-	}
-
-	CFRelease(raw);
-	return 0;
-}
-
-static CFStringRef ax_link_role(void)
-{
-#ifdef kAXLinkRole
-	return kAXLinkRole;
-#else
-	return CFSTR("AXLink");
-#endif
-}
-
-static CFStringRef ax_list_item_role(void)
-{
-#ifdef kAXListItemRole
-	return kAXListItemRole;
-#else
-	return CFSTR("AXListItem");
-#endif
-}
-
-static CFStringRef ax_actions_attribute(void)
-{
-#ifdef kAXActionsAttribute
-	return kAXActionsAttribute;
-#else
-	return CFSTR("AXActions");
-#endif
-}
-
-static CFStringRef ax_visible_children_attribute(void)
-{
-#ifdef kAXVisibleChildrenAttribute
-	return kAXVisibleChildrenAttribute;
-#else
-	return CFSTR("AXVisibleChildren");
-#endif
-}
-
-static CFStringRef ax_children_in_navigation_order_attribute(void)
-{
-#ifdef kAXChildrenInNavigationOrderAttribute
-	return kAXChildrenInNavigationOrderAttribute;
-#else
-	return CFSTR("AXChildrenInNavigationOrder");
-#endif
-}
-
-static CFStringRef ax_contents_attribute(void)
-{
-#ifdef kAXContentsAttribute
-	return kAXContentsAttribute;
-#else
-	return CFSTR("AXContents");
-#endif
-}
-
-static CFStringRef ax_frame_attribute(void)
-{
-#ifdef kAXFrameAttribute
-	return kAXFrameAttribute;
-#else
-	return CFSTR("AXFrame");
-#endif
-}
-
-static CFStringRef ax_menu_bar_attribute(void)
-{
-#ifdef kAXMenuBarAttribute
-	return kAXMenuBarAttribute;
-#else
-	return CFSTR("AXMenuBar");
-#endif
-}
-
-static CFStringRef ax_menu_attribute(void)
-{
-#ifdef kAXMenuAttribute
-	return kAXMenuAttribute;
-#else
-	return CFSTR("AXMenu");
-#endif
-}
-
-static CFStringRef ax_menu_role(void)
-{
-#ifdef kAXMenuRole
-	return kAXMenuRole;
-#else
-	return CFSTR("AXMenu");
-#endif
-}
-
-static CFStringRef ax_menu_bar_item_role(void)
-{
-#ifdef kAXMenuBarItemRole
-	return kAXMenuBarItemRole;
-#else
-	return CFSTR("AXMenuBarItem");
-#endif
-}
-
-static CFStringRef ax_menu_bar_role(void)
-{
-#ifdef kAXMenuBarRole
-	return kAXMenuBarRole;
-#else
-	return CFSTR("AXMenuBar");
-#endif
-}
-
-static int ax_copy_string_attr(AXUIElementRef element, CFStringRef attr,
-			      char *out, size_t out_len);
-
 static int ax_menu_bar_item_title(AXUIElementRef element, char *out, size_t out_len)
 {
 	CFTypeRef role = NULL;
@@ -601,24 +468,6 @@ static int ax_element_is_menu_container(AXUIElementRef element)
 	return is_menu;
 }
 
-static CFStringRef ax_focused_ui_element_attribute(void)
-{
-#ifdef kAXFocusedUIElementAttribute
-	return kAXFocusedUIElementAttribute;
-#else
-	return CFSTR("AXFocusedUIElement");
-#endif
-}
-
-static CFStringRef ax_tabs_attribute(void)
-{
-	/* AXTabs returns an array of tab elements for windows that support tabs */
-	return CFSTR("AXTabs");
-}
-
-static int ax_get_position_size(AXUIElementRef element, CGPoint *position,
-					CGSize *size);
-
 /* File-based debug logging - safer than stderr */
 static FILE *ax_debug_file = NULL;
 
@@ -684,56 +533,10 @@ static int ax_debug_depth(void)
 	return 10; /* Default: max depth of 10 levels */
 }
 
-static int ax_copy_string_attr(AXUIElementRef element, CFStringRef attr,
-			      char *out, size_t out_len)
-{
-	CFTypeRef raw = NULL;
-
-	if (!out || out_len == 0)
-		return 0;
-
-	out[0] = 0;
-	if (AXUIElementCopyAttributeValue(element, attr, &raw) != kAXErrorSuccess ||
-	    !raw)
-		return 0;
-
-	int ok = 0;
-	if (CFGetTypeID(raw) == CFStringGetTypeID()) {
-		ok = CFStringGetCString((CFStringRef)raw, out, out_len,
-					kCFStringEncodingUTF8);
-	}
-
-	CFRelease(raw);
-	return ok;
-}
-
 static void ax_debug_indent(int depth)
 {
 	for (int i = 0; i < depth; i++)
 		ax_debug_log("  ");
-}
-
-static CFArrayRef ax_copy_child_array(AXUIElementRef element, CFStringRef attr)
-{
-	CFTypeRef children_ref = NULL;
-
-	if (AXUIElementCopyAttributeValue(element, attr, &children_ref) !=
-		kAXErrorSuccess || !children_ref)
-		return NULL;
-
-	/* Validate it's actually an array */
-	if (CFGetTypeID(children_ref) != CFArrayGetTypeID()) {
-		CFRelease(children_ref);
-		return NULL;
-	}
-
-	CFArrayRef children = (CFArrayRef)children_ref;
-	if (CFArrayGetCount(children) == 0) {
-		CFRelease(children);
-		return NULL;
-	}
-
-	return children;
 }
 
 static void ax_debug_dump_element(AXUIElementRef element, int depth,
@@ -879,15 +682,6 @@ static void ax_debug_log_element(AXUIElementRef element, const char *status,
 	ax_debug_log("\n");
 }
 
-static CFStringRef ax_image_role(void)
-{
-#ifdef kAXImageRole
-	return kAXImageRole;
-#else
-	return CFSTR("AXImage");
-#endif
-}
-
 static int ax_role_matches(CFStringRef role)
 {
 	return CFEqual(role, kAXButtonRole) ||
@@ -958,20 +752,6 @@ static struct hint *ax_alloc_hints(size_t max_hints)
 	if (max_hints == 0)
 		return NULL;
 	return malloc(sizeof(struct hint) * max_hints);
-}
-
-static CFIndex ax_child_count(AXUIElementRef element, CFStringRef attr)
-{
-	CFIndex count = -1;
-
-	if (!element)
-		return -1;
-
-	if (AXUIElementGetAttributeValueCount(element, attr, &count) !=
-		    kAXErrorSuccess)
-		return -1;
-
-	return count;
 }
 
 static int ax_menu_has_children(AXUIElementRef menu)
@@ -1316,52 +1096,6 @@ static int ax_element_is_interactable(AXUIElementRef element)
 		return 0;
 
 	return 1;
-}
-
-static int ax_get_position_size(AXUIElementRef element, CGPoint *position,
-					CGSize *size)
-{
-	AXValueRef position_value = NULL;
-	AXValueRef size_value = NULL;
-	AXValueRef frame_value = NULL;
-	int has_position = 0;
-	int has_size = 0;
-
-	if (!element)
-		return 0;
-
-	if (AXUIElementCopyAttributeValue(element, kAXPositionAttribute,
-				      (CFTypeRef *)&position_value) == kAXErrorSuccess &&
-	    position_value) {
-		has_position = AXValueGetValue(position_value, kAXValueCGPointType,
-					       position);
-		CFRelease(position_value);
-	}
-
-	if (AXUIElementCopyAttributeValue(element, kAXSizeAttribute,
-				      (CFTypeRef *)&size_value) == kAXErrorSuccess &&
-	    size_value) {
-		has_size = AXValueGetValue(size_value, kAXValueCGSizeType, size);
-		CFRelease(size_value);
-	}
-
-	if (has_position && has_size)
-		return 1;
-
-	if (AXUIElementCopyAttributeValue(element, ax_frame_attribute(),
-				      (CFTypeRef *)&frame_value) == kAXErrorSuccess &&
-	    frame_value) {
-		CGRect frame = CGRectZero;
-		if (AXValueGetValue(frame_value, kAXValueCGRectType, &frame)) {
-			*position = frame.origin;
-			*size = frame.size;
-			CFRelease(frame_value);
-			return 1;
-		}
-		CFRelease(frame_value);
-	}
-
-	return 0;
 }
 
 static int ax_element_center_for_screen(AXUIElementRef element, struct screen *scr,
