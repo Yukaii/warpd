@@ -13,6 +13,63 @@
 /* Declare get_time_us from warpd.c - avoid including warpd.h */
 extern uint64_t get_time_us(void);
 
+struct ax_profile {
+	uint64_t start_us;
+	uint64_t total_us;
+	uint64_t attr_us[5];
+	size_t nodes_visited;
+	size_t interactable_checked;
+	size_t hints_added;
+	size_t dup_skipped;
+	size_t offscreen_skipped;
+	size_t attr_calls[5];
+	size_t attr_children[5];
+	int max_depth;
+};
+
+static struct ax_profile ax_prof;
+
+static void ax_profile_begin(void)
+{
+	if (!ax_prof.start_us)
+		ax_prof.start_us = get_time_us();
+}
+
+void ax_profile_reset(void)
+{
+	memset(&ax_prof, 0, sizeof(ax_prof));
+}
+
+void ax_profile_set_total(uint64_t total_us)
+{
+	ax_prof.total_us = total_us;
+}
+
+void ax_profile_log(const char *label)
+{
+	if (!ax_debug_enabled())
+		return;
+
+	ax_debug_log("=== AX profile (%s) ===\n", label);
+	ax_debug_log("nodes=%zu interactable=%zu hints=%zu dup=%zu offscreen=%zu max_depth=%d\n",
+		     ax_prof.nodes_visited, ax_prof.interactable_checked, ax_prof.hints_added,
+		     ax_prof.dup_skipped, ax_prof.offscreen_skipped, ax_prof.max_depth);
+	ax_debug_log("attr: children=%zu (%llums, calls=%zu) visible=%zu (%llums, calls=%zu) nav=%zu (%llums, calls=%zu) contents=%zu (%llums, calls=%zu) tabs=%zu (%llums, calls=%zu)\n",
+		     ax_prof.attr_children[0],
+		     (unsigned long long)(ax_prof.attr_us[0] / 1000), ax_prof.attr_calls[0],
+		     ax_prof.attr_children[1],
+		     (unsigned long long)(ax_prof.attr_us[1] / 1000), ax_prof.attr_calls[1],
+		     ax_prof.attr_children[2],
+		     (unsigned long long)(ax_prof.attr_us[2] / 1000), ax_prof.attr_calls[2],
+		     ax_prof.attr_children[3],
+		     (unsigned long long)(ax_prof.attr_us[3] / 1000), ax_prof.attr_calls[3],
+		     ax_prof.attr_children[4],
+		     (unsigned long long)(ax_prof.attr_us[4] / 1000), ax_prof.attr_calls[4]);
+	ax_debug_log("time: total=%llums\n",
+		     (unsigned long long)(ax_prof.total_us / 1000));
+	ax_debug_log("\n");
+}
+
 static int ax_role_matches(CFStringRef role)
 {
 	return CFEqual(role, kAXButtonRole) ||
@@ -277,28 +334,44 @@ int ax_element_is_interactable(AXUIElementRef element)
 }
 
 static void ax_collect_interactable_children(AXUIElementRef element,
-					     CFStringRef attribute,
-					     struct screen *scr,
-					     const CGRect *window_frame,
-					     struct hint *hints,
-					     size_t max_hints, size_t *count,
-					     uint64_t deadline_us,
-					     CFMutableSetRef visited)
+				     CFStringRef attribute,
+				     struct screen *scr,
+				     const CGRect *window_frame,
+				     struct hint *hints,
+				     size_t max_hints, size_t *count,
+				     uint64_t deadline_us,
+				     CFMutableSetRef visited,
+				     int depth,
+				     int attr_idx)
 {
 	CFTypeRef children_ref = NULL;
+	uint64_t attr_start_us = 0;
+
+	if (ax_debug_enabled()) {
+		ax_profile_begin();
+		attr_start_us = get_time_us();
+		ax_prof.attr_calls[attr_idx]++;
+	}
 
 	if (AXUIElementCopyAttributeValue(element, attribute, &children_ref) !=
-		kAXErrorSuccess || !children_ref)
+		kAXErrorSuccess || !children_ref) {
+		if (ax_debug_enabled() && attr_start_us)
+			ax_prof.attr_us[attr_idx] += get_time_us() - attr_start_us;
 		return;
+	}
 
 	/* Validate it's actually an array */
 	if (CFGetTypeID(children_ref) != CFArrayGetTypeID()) {
 		CFRelease(children_ref);
+		if (ax_debug_enabled() && attr_start_us)
+			ax_prof.attr_us[attr_idx] += get_time_us() - attr_start_us;
 		return;
 	}
 
 	CFArrayRef children = (CFArrayRef)children_ref;
 	CFIndex child_count = CFArrayGetCount(children);
+	if (ax_debug_enabled())
+		ax_prof.attr_children[attr_idx] += (size_t)child_count;
 	for (CFIndex i = 0; i < child_count && *count < max_hints; i++) {
 		if (deadline_us > 0 && get_time_us() >= deadline_us)
 			break;
@@ -310,20 +383,25 @@ static void ax_collect_interactable_children(AXUIElementRef element,
 			continue;
 		AXUIElementRef child = (AXUIElementRef)child_ref;
 		ax_collect_interactable_hints(child, scr, window_frame,
-					      hints, max_hints, count, deadline_us, visited);
+				      hints, max_hints, count, deadline_us, visited,
+				      depth + 1);
 		if (*count >= max_hints)
 			break;
 	}
 
 	CFRelease(children);
+	if (ax_debug_enabled() && attr_start_us)
+		ax_prof.attr_us[attr_idx] += get_time_us() - attr_start_us;
 }
+
 
 void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 				   const CGRect *window_frame,
 				   struct hint *hints,
 				   size_t max_hints, size_t *count,
 				   uint64_t deadline_us,
-				   CFMutableSetRef visited)
+				   CFMutableSetRef visited,
+				   int depth)
 {
 	if (!element)
 		return;
@@ -333,6 +411,13 @@ void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 
 	if (deadline_us > 0 && get_time_us() >= deadline_us)
 		return;
+
+	if (ax_debug_enabled()) {
+		ax_profile_begin();
+		ax_prof.nodes_visited++;
+		if (depth > ax_prof.max_depth)
+			ax_prof.max_depth = depth;
+	}
 
 	if (visited) {
 		if (CFSetContainsValue(visited, element))
@@ -348,49 +433,59 @@ void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 		int x;
 		int y;
 
+		if (ax_debug_enabled())
+			ax_prof.interactable_checked++;
+
 		if (ax_element_center_for_screen(element, scr, window_frame, &x, &y)) {
 			/* Skip duplicate positions */
 			if (ax_hint_position_exists(hints, *count, x, y)) {
+				if (ax_debug_enabled())
+					ax_prof.dup_skipped++;
 				ax_debug_log_element(element, "DUP", x, y);
 			} else {
 				hints[*count].x = x;
 				hints[*count].y = y;
 				(*count)++;
+				if (ax_debug_enabled())
+					ax_prof.hints_added++;
 				ax_debug_log_element(element, "HINT", x, y);
 				if (*count >= max_hints)
 					return;
 			}
 		} else {
+			if (ax_debug_enabled())
+				ax_prof.offscreen_skipped++;
 			ax_debug_log_element(element, "OFFSCREEN", -1, -1);
 		}
 	}
 
 	ax_collect_interactable_children(element, kAXChildrenAttribute, scr,
-					 window_frame, hints, max_hints, count,
-					 deadline_us, visited);
+				 window_frame, hints, max_hints, count,
+				 deadline_us, visited, depth, 0);
 	if (*count >= max_hints)
 		return;
 	ax_collect_interactable_children(element, ax_visible_children_attribute(), scr,
-					 window_frame, hints, max_hints, count,
-					 deadline_us, visited);
+				 window_frame, hints, max_hints, count,
+				 deadline_us, visited, depth, 1);
 	if (*count >= max_hints)
 		return;
 	ax_collect_interactable_children(element,
-					 ax_children_in_navigation_order_attribute(),
-					 scr, window_frame, hints, max_hints, count,
-					 deadline_us, visited);
+				 ax_children_in_navigation_order_attribute(),
+				 scr, window_frame, hints, max_hints, count,
+				 deadline_us, visited, depth, 2);
 	if (*count >= max_hints)
 		return;
 	ax_collect_interactable_children(element, ax_contents_attribute(), scr,
-					 window_frame, hints, max_hints, count,
-					 deadline_us, visited);
+				 window_frame, hints, max_hints, count,
+				 deadline_us, visited, depth, 3);
 	if (*count >= max_hints)
 		return;
 	/* Try to collect tabs if the element has an AXTabs attribute (e.g., browser tabs) */
 	ax_collect_interactable_children(element, ax_tabs_attribute(), scr,
-					 window_frame, hints, max_hints, count,
-					 deadline_us, visited);
+				 window_frame, hints, max_hints, count,
+				 deadline_us, visited, depth, 4);
 }
+
 
 /*
  * BFS version of hint collection - better for menu bars and web content

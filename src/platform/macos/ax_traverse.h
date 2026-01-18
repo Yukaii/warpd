@@ -14,16 +14,17 @@ int ax_element_is_interactable(AXUIElementRef element);
 
 void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 				   const CGRect *window_frame,
-				   struct hint *hints,
-				   size_t max_hints, size_t *count,
-				   uint64_t deadline_us,
-				   CFMutableSetRef visited);
+				   struct hint *hints, size_t max_hints,
+				   size_t *count, uint64_t deadline_us,
+				   CFMutableSetRef visited, int depth);
 
 void ax_collect_hints_bfs(AXUIElementRef root, struct screen *scr,
-			  const CGRect *window_frame,
-			  struct hint *hints, size_t max_hints,
-			  size_t *count, uint64_t deadline_us,
-			  int skip_menu_containers,
-			  int include_menu_attr);
+			  const CGRect *window_frame, struct hint *hints,
+			  size_t max_hints, size_t *count, uint64_t deadline_us,
+			  int skip_menu_containers, int include_menu_attr);
+
+void ax_profile_reset(void);
+void ax_profile_set_total(uint64_t total_us);
+void ax_profile_log(const char *label);
 
 #endif

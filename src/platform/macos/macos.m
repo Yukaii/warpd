@@ -836,7 +836,8 @@ static size_t collect_window_phase(AXUIElementRef focused_app, struct screen *sc
 					     hints, max_hints, &count, bfs_deadline_us, 0, 0);
 		}
 		ax_collect_interactable_hints(focused_window, scr, NULL,
-					      hints, max_hints, &count, deadline_us, visited);
+				      hints, max_hints, &count, deadline_us, visited, 0);
+
 		CFRelease(focused_window);
 
 	} else {
@@ -853,8 +854,9 @@ static size_t collect_window_phase(AXUIElementRef focused_app, struct screen *sc
 				if (should_dump)
 					ax_debug_dump_tree(window, "window");
 				ax_collect_interactable_hints(window, scr, NULL,
-							      hints, max_hints, &count,
-							      deadline_us, visited);
+					      hints, max_hints, &count,
+					      deadline_us, visited, 0);
+
 			}
 
 			CFRelease(windows);
@@ -867,8 +869,9 @@ static size_t collect_window_phase(AXUIElementRef focused_app, struct screen *sc
 			if (should_dump)
 				ax_debug_dump_tree(focused_element, "focused_element");
 			ax_collect_interactable_hints(focused_element, scr, NULL,
-						      hints, max_hints, &count,
-						      deadline_us, visited);
+				      hints, max_hints, &count,
+				      deadline_us, visited, 0);
+
 		}
 	}
 
@@ -916,8 +919,11 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 		     (unsigned long long)((menu_end_us - menu_start_us) / 1000));
 
 	uint64_t window_start_us = get_time_us();
+	ax_profile_reset();
 	count = collect_window_phase(focused_app, scr, hints, max_hints, count,
 			     is_electron, should_dump);
+	ax_profile_set_total(get_time_us() - window_start_us);
+	ax_profile_log("window");
 	uint64_t window_end_us = get_time_us();
 	ax_debug_log("=== Phase timing: window=%llums ===\n",
 		     (unsigned long long)((window_end_us - window_start_us) / 1000));
