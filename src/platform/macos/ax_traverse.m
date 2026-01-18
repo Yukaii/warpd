@@ -333,7 +333,7 @@ int ax_element_is_interactable(AXUIElementRef element)
 	return 1;
 }
 
-static void ax_collect_interactable_children(AXUIElementRef element,
+static size_t ax_collect_interactable_children(AXUIElementRef element,
 				     CFStringRef attribute,
 				     struct screen *scr,
 				     const CGRect *window_frame,
@@ -357,7 +357,7 @@ static void ax_collect_interactable_children(AXUIElementRef element,
 		kAXErrorSuccess || !children_ref) {
 		if (ax_debug_enabled() && attr_start_us)
 			ax_prof.attr_us[attr_idx] += get_time_us() - attr_start_us;
-		return;
+		return 0;
 	}
 
 	/* Validate it's actually an array */
@@ -365,7 +365,7 @@ static void ax_collect_interactable_children(AXUIElementRef element,
 		CFRelease(children_ref);
 		if (ax_debug_enabled() && attr_start_us)
 			ax_prof.attr_us[attr_idx] += get_time_us() - attr_start_us;
-		return;
+		return 0;
 	}
 
 	CFArrayRef children = (CFArrayRef)children_ref;
@@ -392,6 +392,7 @@ static void ax_collect_interactable_children(AXUIElementRef element,
 	CFRelease(children);
 	if (ax_debug_enabled() && attr_start_us)
 		ax_prof.attr_us[attr_idx] += get_time_us() - attr_start_us;
+	return (size_t)child_count;
 }
 
 
@@ -429,6 +430,19 @@ void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 	if (ax_debug_verbose())
 		ax_debug_log_element(element, "VISIT", -1, -1);
 
+	int hidden = 0;
+	int should_traverse = 1;
+	if (ax_get_bool_attr(element, kAXHiddenAttribute, &hidden) && hidden)
+		should_traverse = 0;
+	if (should_traverse) {
+		CGPoint pos = CGPointZero;
+		CGSize size = CGSizeZero;
+		if (ax_get_position_size(element, &pos, &size)) {
+			if (size.width <= 0 || size.height <= 0)
+				should_traverse = 0;
+		}
+	}
+
 	if (ax_element_is_interactable(element)) {
 		int x;
 		int y;
@@ -459,31 +473,46 @@ void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 		}
 	}
 
-	ax_collect_interactable_children(element, kAXChildrenAttribute, scr,
-				 window_frame, hints, max_hints, count,
-				 deadline_us, visited, depth, 0);
+	if (!should_traverse)
+		return;
+
+	size_t children_found = 0;
+
+	children_found = ax_collect_interactable_children(element, kAXChildrenAttribute,
+						scr, window_frame, hints, max_hints, count,
+						deadline_us, visited, depth, 0);
 	if (*count >= max_hints)
 		return;
-	ax_collect_interactable_children(element, ax_visible_children_attribute(), scr,
-				 window_frame, hints, max_hints, count,
-				 deadline_us, visited, depth, 1);
-	if (*count >= max_hints)
-		return;
-	ax_collect_interactable_children(element,
-				 ax_children_in_navigation_order_attribute(),
-				 scr, window_frame, hints, max_hints, count,
-				 deadline_us, visited, depth, 2);
-	if (*count >= max_hints)
-		return;
-	ax_collect_interactable_children(element, ax_contents_attribute(), scr,
-				 window_frame, hints, max_hints, count,
-				 deadline_us, visited, depth, 3);
-	if (*count >= max_hints)
-		return;
-	/* Try to collect tabs if the element has an AXTabs attribute (e.g., browser tabs) */
-	ax_collect_interactable_children(element, ax_tabs_attribute(), scr,
-				 window_frame, hints, max_hints, count,
-				 deadline_us, visited, depth, 4);
+	if (children_found == 0) {
+		children_found = ax_collect_interactable_children(element,
+							 ax_visible_children_attribute(), scr,
+							 window_frame, hints, max_hints, count,
+							 deadline_us, visited, depth, 1);
+		if (*count >= max_hints)
+			return;
+	}
+	if (children_found == 0) {
+		children_found = ax_collect_interactable_children(element,
+							 ax_children_in_navigation_order_attribute(),
+							 scr, window_frame, hints, max_hints, count,
+							 deadline_us, visited, depth, 2);
+		if (*count >= max_hints)
+			return;
+	}
+	if (children_found == 0) {
+		children_found = ax_collect_interactable_children(element,
+							 ax_contents_attribute(), scr,
+							 window_frame, hints, max_hints, count,
+							 deadline_us, visited, depth, 3);
+		if (*count >= max_hints)
+			return;
+	}
+	if (children_found == 0) {
+		/* Try to collect tabs if the element has an AXTabs attribute (e.g., browser tabs) */
+		ax_collect_interactable_children(element, ax_tabs_attribute(), scr,
+							 window_frame, hints, max_hints, count,
+							 deadline_us, visited, depth, 4);
+	}
 }
 
 
@@ -520,6 +549,7 @@ void ax_collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 
 		/* Check if interactable */
 		if (ax_element_is_interactable(element)) {
+
 			int x, y;
 			int add_hint = 1;
 
