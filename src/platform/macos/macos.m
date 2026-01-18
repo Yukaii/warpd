@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <float.h>
 #include <unistd.h>
 
 /* Declare get_time_us from warpd.c - avoid including warpd.h to prevent conflicts */
@@ -1308,15 +1307,13 @@ static size_t collect_menu_hints_from_menu_bar(AXUIElementRef app,
 					       struct hint *out_hints,
 					       uint64_t deadline_us)
 {
-	AXUIElementRef menu_bar = NULL;
-	CFTypeRef children_ref = NULL;
 	size_t best_count = 0;
-	double best_distance = DBL_MAX;
 	NSPoint mouse_loc = [NSEvent mouseLocation];
 	double mouse_x = mouse_loc.x;
 	AXUIElementRef best_menu_item = NULL;
 	char best_menu_title[256];
 	best_menu_title[0] = 0;
+	int scan_result = AX_MENU_SCAN_OK;
 
 	if (!app || !base_hints || !out_hints)
 		return 0;
@@ -1327,86 +1324,30 @@ static size_t collect_menu_hints_from_menu_bar(AXUIElementRef app,
 			     (unsigned long long)deadline_us);
 	}
 
-	if (AXUIElementCopyAttributeValue(app, ax_menu_bar_attribute(),
-					  (CFTypeRef *)&menu_bar) != kAXErrorSuccess ||
-	    !menu_bar) {
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_SCAN menu_bar_missing\n");
-		return 0;
-	}
-
-	if (AXUIElementCopyAttributeValue(menu_bar, kAXChildrenAttribute,
-					  &children_ref) != kAXErrorSuccess ||
-	    !children_ref) {
-		CFRelease(menu_bar);
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_SCAN menu_bar_children_missing\n");
-		return 0;
-	}
-
-	if (CFGetTypeID(children_ref) != CFArrayGetTypeID()) {
-		CFRelease(children_ref);
-		CFRelease(menu_bar);
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_SCAN menu_bar_children_not_array\n");
-		return 0;
-	}
-
-	CFArrayRef children = (CFArrayRef)children_ref;
-	CFIndex child_count = CFArrayGetCount(children);
-	for (CFIndex i = 0; i < child_count; i++) {
-		CFTypeRef child_ref = CFArrayGetValueAtIndex(children, i);
-		AXUIElementRef menu_item = NULL;
-		CFTypeRef role = NULL;
-		int is_menu_bar_item = 0;
-		CGPoint position = CGPointZero;
-		CGSize size = CGSizeZero;
-
-		if (!child_ref || CFGetTypeID(child_ref) != AXUIElementGetTypeID())
-			continue;
-
-		menu_item = (AXUIElementRef)child_ref;
-
-		if (AXUIElementCopyAttributeValue(menu_item, kAXRoleAttribute,
-						  &role) == kAXErrorSuccess &&
-		    role) {
-			if (CFGetTypeID(role) == CFStringGetTypeID())
-				is_menu_bar_item =
-					CFEqual((CFStringRef)role,
-						ax_menu_bar_item_role());
-			CFRelease(role);
-		}
-
-		if (!is_menu_bar_item)
-			continue;
-
-		if (!ax_get_position_size(menu_item, &position, &size) ||
-		    size.width < 5 || size.height < 5)
-			continue;
-
-		double left = position.x;
-		double right = position.x + size.width;
-		double distance = 0.0;
-		if (mouse_x < left)
-			distance = left - mouse_x;
-		else if (mouse_x > right)
-			distance = mouse_x - right;
-
-		if (distance < best_distance) {
-			if (best_menu_item)
-				CFRelease(best_menu_item);
-			CFRetain(menu_item);
-			best_menu_item = menu_item;
-			best_distance = distance;
-		}
-	}
-
-	CFRelease(children_ref);
-	CFRelease(menu_bar);
-
+	best_menu_item = ax_menu_bar_item_nearest(app, mouse_x, &scan_result);
 	if (!best_menu_item) {
-		if (ax_debug_enabled())
-			ax_debug_log("MENU_SCAN no_best_menu_item\n");
+		if (ax_debug_enabled()) {
+			switch (scan_result) {
+			case AX_MENU_SCAN_NO_APP:
+				ax_debug_log("MENU_SCAN no_app\n");
+				break;
+			case AX_MENU_SCAN_NO_MENU_BAR:
+				ax_debug_log("MENU_SCAN menu_bar_missing\n");
+				break;
+			case AX_MENU_SCAN_NO_CHILDREN:
+				ax_debug_log("MENU_SCAN menu_bar_children_missing\n");
+				break;
+			case AX_MENU_SCAN_CHILDREN_BAD_TYPE:
+				ax_debug_log("MENU_SCAN menu_bar_children_not_array\n");
+				break;
+			case AX_MENU_SCAN_NO_ITEM:
+				ax_debug_log("MENU_SCAN no_best_menu_item\n");
+				break;
+			default:
+				ax_debug_log("MENU_SCAN no_best_menu_item\n");
+				break;
+			}
+		}
 		return 0;
 	}
 

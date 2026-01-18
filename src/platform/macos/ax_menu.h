@@ -18,4 +18,16 @@ AXUIElementRef ax_menu_root_for_element(AXUIElementRef element);
 AXUIElementRef ax_menu_from_menu_bar_item(AXUIElementRef element);
 int ax_press_menu_bar_item(AXUIElementRef element);
 
+enum ax_menu_scan_result {
+	AX_MENU_SCAN_OK = 0,
+	AX_MENU_SCAN_NO_APP,
+	AX_MENU_SCAN_NO_MENU_BAR,
+	AX_MENU_SCAN_NO_CHILDREN,
+	AX_MENU_SCAN_CHILDREN_BAD_TYPE,
+	AX_MENU_SCAN_NO_ITEM,
+};
+
+AXUIElementRef ax_menu_bar_item_nearest(AXUIElementRef app, double mouse_x,
+					int *scan_result);
+
 #endif
