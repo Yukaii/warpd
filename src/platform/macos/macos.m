@@ -1704,36 +1704,13 @@ menu_loop_cleanup:
 	return count;
 }
 
-size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
-				      size_t max_hints)
+static size_t collect_window_phase(AXUIElementRef focused_app, struct screen *scr,
+				   struct hint *hints, size_t max_hints,
+				   size_t count, int is_electron,
+				   int should_dump)
 {
-	if (!AXIsProcessTrusted())
-		return 0;
-
-	AXUIElementRef focused_app = get_focused_app();
-	if (!focused_app)
-		return 0;
-
-	/* Initialize debug logging if enabled */
-	ax_debug_open();
-
-	/* Enable accessibility for apps that need explicit attribute setting */
-	int app_flags = enable_app_accessibility(focused_app);
-	int is_electron = (app_flags & APP_FLAG_ELECTRON) != 0;
-	AXUIElementRef focused_element = NULL;
-
-	ax_debug_log("=== Starting hint collection (max=%zu) ===\n", max_hints);
-
-	size_t count = 0;
 	AXError error;
-	int should_dump = ax_debug_dump_enabled();
-
-	/*
-	 * Scan menu bars FIRST using BFS - this ensures we get all top-level
-	 * menu items (File, Edit, View, etc.) before diving into submenus.
-	 */
-	count = collect_menu_phase(focused_app, scr, hints, max_hints,
-				   is_electron, should_dump);
+	AXUIElementRef focused_element = NULL;
 
 	if (AXUIElementCopyAttributeValue(
 		focused_app, ax_focused_ui_element_attribute(),
@@ -1821,6 +1798,41 @@ size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
 
 	if (visited)
 		CFRelease(visited);
+
+	return count;
+}
+
+size_t osx_collect_interactable_hints(struct screen *scr, struct hint *hints,
+				      size_t max_hints)
+{
+	if (!AXIsProcessTrusted())
+		return 0;
+
+	AXUIElementRef focused_app = get_focused_app();
+	if (!focused_app)
+		return 0;
+
+	/* Initialize debug logging if enabled */
+	ax_debug_open();
+
+	/* Enable accessibility for apps that need explicit attribute setting */
+	int app_flags = enable_app_accessibility(focused_app);
+	int is_electron = (app_flags & APP_FLAG_ELECTRON) != 0;
+
+	ax_debug_log("=== Starting hint collection (max=%zu) ===\n", max_hints);
+
+	size_t count = 0;
+	int should_dump = ax_debug_dump_enabled();
+
+	/*
+	 * Scan menu bars FIRST using BFS - this ensures we get all top-level
+	 * menu items (File, Edit, View, etc.) before diving into submenus.
+	 */
+	count = collect_menu_phase(focused_app, scr, hints, max_hints,
+				   is_electron, should_dump);
+
+	count = collect_window_phase(focused_app, scr, hints, max_hints, count,
+				     is_electron, should_dump);
 
 	CFRelease(focused_app);
 
