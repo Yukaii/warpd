@@ -190,6 +190,89 @@ static int is_focused_app_kitty(void)
 	return 0;
 }
 
+static int is_cef_app(NSRunningApplication *runningApp)
+{
+	if (!runningApp)
+		return 0;
+
+	NSURL *bundleURL = [runningApp bundleURL];
+	if (!bundleURL)
+		return 0;
+
+	NSString *bundlePath = [bundleURL path];
+	if (!bundlePath)
+		return 0;
+
+	NSFileManager *fileManager = [NSFileManager defaultManager];
+	NSString *frameworksPath = [bundlePath stringByAppendingPathComponent:
+		@"Contents/Frameworks"];
+	NSArray *frameworkItems =
+		[fileManager contentsOfDirectoryAtPath:frameworksPath error:nil];
+
+	if (!frameworkItems || ![frameworkItems containsObject:
+		@"Chromium Embedded Framework.framework"]) {
+		return 0;
+	}
+
+	for (NSString *item in frameworkItems) {
+		if ([item hasSuffix:@"Helper.app"] ||
+			[item hasSuffix:@"Helper (Renderer).app"] ||
+			[item hasSuffix:@"Helper (GPU).app"] ||
+			[item hasSuffix:@"Helper (Plugin).app"]) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+static int is_electron_app(NSRunningApplication *runningApp)
+{
+	if (!runningApp)
+		return 0;
+
+	NSURL *bundleURL = [runningApp bundleURL];
+	if (!bundleURL)
+		return 0;
+
+	NSString *bundlePath = [bundleURL path];
+	if (!bundlePath)
+		return 0;
+
+	NSFileManager *fileManager = [NSFileManager defaultManager];
+	NSString *asarPath = [bundlePath stringByAppendingPathComponent:
+		@"Contents/Resources/app.asar"];
+	if ([fileManager fileExistsAtPath:asarPath])
+		return 1;
+
+	NSString *asarUnpackedPath = [bundlePath stringByAppendingPathComponent:
+		@"Contents/Resources/app.asar.unpacked"];
+	if ([fileManager fileExistsAtPath:asarUnpackedPath])
+		return 1;
+
+	NSString *frameworkPath = [bundlePath stringByAppendingPathComponent:
+		@"Contents/Frameworks/Electron Framework.framework"];
+	if ([fileManager fileExistsAtPath:frameworkPath])
+		return 1;
+
+	NSString *helperPath = [bundlePath stringByAppendingPathComponent:
+		@"Contents/Frameworks/Electron Helper.app"];
+	if ([fileManager fileExistsAtPath:helperPath])
+		return 1;
+
+	NSString *helperRendererPath = [bundlePath stringByAppendingPathComponent:
+		@"Contents/Frameworks/Electron Helper (Renderer).app"];
+	if ([fileManager fileExistsAtPath:helperRendererPath])
+		return 1;
+
+	NSString *helperGpuPath = [bundlePath stringByAppendingPathComponent:
+		@"Contents/Frameworks/Electron Helper (GPU).app"];
+	if ([fileManager fileExistsAtPath:helperGpuPath])
+		return 1;
+
+	return 0;
+}
+
 #define APP_FLAG_CHROMIUM 1
 #define APP_FLAG_ELECTRON 2
 
@@ -225,6 +308,7 @@ static int enable_app_accessibility(AXUIElementRef app)
 
 	int is_chromium = 0;
 	int is_electron = 0;
+	int is_cef = 0;
 	int flags = 0;
 
 	/* Chrome and Chromium-based browsers need AXEnhancedUserInterface */
@@ -249,31 +333,10 @@ static int enable_app_accessibility(AXUIElementRef app)
 	}
 
 	/* Electron apps need AXManualAccessibility */
-	static NSArray *electronBundleIds = nil;
-	if (!electronBundleIds) {
-		electronBundleIds = @[
-			@"com.electron.",           /* Generic Electron apps */
-			@"com.github.Electron",     /* Electron framework */
-			@"com.microsoft.VSCode",    /* VS Code */
-			@"com.hnc.Discord",         /* Discord */
-			@"com.slack.Slack",         /* Slack */
-			@"com.spotify.client",      /* Spotify */
-			@"com.tinyspeck.slackmacgap", /* Slack (older) */
-			@"com.figma.Desktop",       /* Figma */
-			@"com.notion.Notion",       /* Notion */
-			@"com.linear.Linear",       /* Linear */
-			@"com.obsidian.Obsidian",   /* Obsidian - Electron-based */
-		];
-	}
+	is_electron = is_electron_app(runningApp);
+	is_cef = is_cef_app(runningApp);
 
-	for (NSString *electronId in electronBundleIds) {
-		if ([bundleId hasPrefix:electronId]) {
-			is_electron = 1;
-			break;
-		}
-	}
-
-	if (is_chromium) {
+	if (is_chromium || is_cef) {
 		AXUIElementSetAttributeValue(app,
 			CFSTR("AXEnhancedUserInterface"), value);
 		ax_debug_log("Enabled AXEnhancedUserInterface for: %s\n",
@@ -281,7 +344,7 @@ static int enable_app_accessibility(AXUIElementRef app)
 		flags |= APP_FLAG_CHROMIUM;
 	}
 
-	if (is_electron) {
+	if (is_electron || is_cef) {
 		AXUIElementSetAttributeValue(app,
 			CFSTR("AXManualAccessibility"), value);
 		ax_debug_log("Enabled AXManualAccessibility for Electron app: %s\n",
@@ -289,7 +352,7 @@ static int enable_app_accessibility(AXUIElementRef app)
 		flags |= APP_FLAG_ELECTRON;
 	}
 
-	if (is_chromium || is_electron) {
+	if (is_chromium || is_electron || is_cef) {
 		ax_debug_log("Accessibility attributes set for: %s\n",
 			[bundleId UTF8String]);
 	}
