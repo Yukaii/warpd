@@ -32,5 +32,11 @@ else
 	include mk/linux.mk
 endif
 
+include mk/rust.mk
+
 man:
 	scdoc < warpd.1.md | gzip > files/warpd.1.gz
+
+test: test-rust
+
+.PHONY: test

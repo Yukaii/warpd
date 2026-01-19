@@ -11,3 +11,5 @@ bin/
 dist/
 *.obj
 *.exe
+ui/target/
+**/*.rs.bk
