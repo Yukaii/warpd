@@ -171,6 +171,24 @@ Modified `input_parse_string()` in `src/input.c` to use QWERTY-based lookup for 
 - `src/platform/macos/mouse.m`
 - `src/mouse.c`
 
+### 13. Multi-monitor targeting and find-mode fixes (`unreleased`)
+
+**Additions/Fixes:**
+- Screen selection now sets an active screen for mode-scoped targeting
+- Cursor and hint modes respect the selected screen across monitors
+- Find mode better handles external-monitor AX coordinates
+- History hint layout uses the current monitor dimensions
+
+**Files modified:**
+- `src/screen.c`
+- `src/warpd.h`
+- `src/normal.c`
+- `src/grid.c`
+- `src/hint.c`
+- `src/mouse.c`
+- `src/mode-loop.c`
+- `src/platform/macos/ax_menu.m`
+
 ## Compatibility
 
 These changes are backward compatible:
