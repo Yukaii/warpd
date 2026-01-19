@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -307,6 +308,166 @@ static void validate_key_option(const char *s)
 	}
 }
 
+static int is_valid_key_option(const char *s)
+{
+	struct input_event ev;
+	char *tok;
+	char buf[1024];
+	size_t len;
+
+	len = strlen(s);
+	if (len >= sizeof buf)
+		return 0;
+	strncpy(buf, s, sizeof buf);
+	buf[sizeof buf - 1] = 0;
+
+	if (!strcmp(s, "unbind"))
+		return 1;
+
+	for (tok = strtok(buf, " "); tok; tok = strtok(NULL, " ")) {
+		if (input_parse_string(&ev, tok))
+			return 0;
+	}
+
+	return 1;
+}
+
+int config_set_value(const char *key, const char *value)
+{
+	struct config_entry *ent;
+	enum option_type type;
+	size_t len;
+	int i;
+	size_t value_cap = sizeof(((struct config_entry *)0)->value);
+
+	if (!key || !value)
+		return 0;
+
+	type = get_option_type(key);
+	if (!type)
+		return 0;
+
+	len = strlen(value);
+	if (len >= value_cap)
+		return 0;
+
+	switch (type) {
+	case OPT_INT:
+		for (i = 0; value[i]; i++)
+			if (!isdigit((unsigned char)value[i]) &&
+			    !(i == 0 && value[0] == '-'))
+				return 0;
+		break;
+	case OPT_BUTTON:
+	case OPT_KEY:
+		if (!is_valid_key_option(value))
+			return 0;
+		break;
+	default:
+		break;
+	}
+
+	for (ent = config; ent; ent = ent->next) {
+		if (!strcmp(ent->key, key)) {
+			strncpy(ent->value, value, sizeof ent->value);
+			ent->value[sizeof ent->value - 1] = 0;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+struct strbuf {
+	char *data;
+	size_t len;
+	size_t cap;
+};
+
+static void sb_init(struct strbuf *sb)
+{
+	sb->cap = 1024;
+	sb->len = 0;
+	sb->data = calloc(1, sb->cap);
+}
+
+static void sb_reserve(struct strbuf *sb, size_t extra)
+{
+	if (sb->len + extra + 1 <= sb->cap)
+		return;
+
+	while (sb->len + extra + 1 > sb->cap)
+		sb->cap *= 2;
+
+	sb->data = realloc(sb->data, sb->cap);
+}
+
+static void sb_append(struct strbuf *sb, const char *fmt, ...)
+{
+	va_list ap;
+	int needed;
+
+	va_start(ap, fmt);
+	needed = vsnprintf(NULL, 0, fmt, ap);
+	va_end(ap);
+
+	if (needed < 0)
+		return;
+
+	sb_reserve(sb, (size_t)needed);
+
+	va_start(ap, fmt);
+	vsnprintf(sb->data + sb->len, sb->cap - sb->len, fmt, ap);
+	va_end(ap);
+	sb->len += (size_t)needed;
+}
+
+static void sb_append_char(struct strbuf *sb, char c)
+{
+	sb_reserve(sb, 1);
+	sb->data[sb->len++] = c;
+	sb->data[sb->len] = '\0';
+}
+
+static void sb_append_escaped(struct strbuf *sb, const char *s)
+{
+	for (; s && *s; s++) {
+		if (*s == '"' || *s == '\\')
+			sb_append_char(sb, '\\');
+		sb_append_char(sb, *s);
+	}
+}
+
+char *config_schema_json(void)
+{
+	struct strbuf sb;
+	size_t i;
+	int first = 1;
+
+	sb_init(&sb);
+	sb_append(&sb, "{\"entries\":[");
+
+	for (i = 0; i < sizeof(options) / sizeof(options[0]); i++) {
+		if (!first)
+			sb_append_char(&sb, ',');
+		first = 0;
+
+		sb_append(&sb, "{\"key\":\"");
+		sb_append_escaped(&sb, options[i].key);
+		sb_append(&sb, "\",\"default\":\"");
+		sb_append_escaped(&sb, options[i].val);
+		sb_append(&sb, "\",\"type\":\"%s\",\"description\":\"",
+			  options[i].type == OPT_STRING ? "string" :
+			  options[i].type == OPT_INT ? "int" :
+			  options[i].type == OPT_KEY ? "key" :
+			  options[i].type == OPT_BUTTON ? "button" : "unknown");
+		sb_append_escaped(&sb, options[i].description);
+		sb_append(&sb, "\"}");
+	}
+
+	sb_append(&sb, "]}");
+	return sb.data;
+}
 static void config_add(const char *key, const char *val)
 {
 	struct config_entry *ent;

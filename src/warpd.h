@@ -142,6 +142,8 @@ void parse_config(const char *path);
 const char *config_get(const char *key);
 int config_get_int(const char *key);
 void config_print_options();
+int config_set_value(const char *key, const char *value);
+char *config_schema_json(void);
 
 uint64_t get_time_us();
 

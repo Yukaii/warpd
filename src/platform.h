@@ -37,6 +37,9 @@ struct hint {
 	int h;
 
 	char label[16];
+	char title[128];
+	char role[64];
+	char desc[128];
 };
 
 struct screen;

@@ -1,4 +1,9 @@
 #include "warpd.h"
+#include "ipc.h"
+
+#ifndef _WIN32
+#include <pthread.h>
+#endif
 static const char *activation_keys[] = {
     "activation_key",	    "hint_activation_key", "find_activation_key",
     "grid_activation_key",  "hint_oneshot_key",	   "screen_activation_key",
@@ -13,6 +18,19 @@ static int activation_event_match(const struct input_event *ev,
 {
 	return ev && ev->code == key->code && ev->mods == key->mods;
 }
+
+#ifndef _WIN32
+static void *ipc_thread_run(void *arg)
+{
+	struct ipc_server *server = arg;
+
+	ipc_init(server);
+	for (;;)
+		ipc_poll(server, 100);
+
+	return NULL;
+}
+#endif
 
 static void reload_config(const char *path)
 {
@@ -30,6 +48,13 @@ static void reload_config(const char *path)
 
 void daemon_loop(const char *config_path)
 {
+#ifndef _WIN32
+	static struct ipc_server ipc_server;
+	pthread_t ipc_thread;
+
+	if (pthread_create(&ipc_thread, NULL, ipc_thread_run, &ipc_server) == 0)
+		pthread_detach(ipc_thread);
+#endif
 	size_t i;
 
 	platform->monitor_file(config_path);

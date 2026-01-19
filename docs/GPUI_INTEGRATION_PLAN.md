@@ -586,7 +586,7 @@ pub struct RpcError {
 ```json
 // Get all interactable elements
 { "id": 10, "method": "elements.list" }
-→ { "id": 10, "result": { "elements": [...], "screen_id": 0 } }
+→ { "id": 10, "result": { "elements": [{ "id": 0, "hint": "a", "label": "Save", "role": "AXButton", "desc": "button" }] } }
 
 // Perform action on element
 { "id": 11, "method": "elements.click", "params": { "id": 42 } }
@@ -598,7 +598,7 @@ pub struct RpcError {
 
 // Get element details
 { "id": 13, "method": "elements.info", "params": { "id": 42 } }
-→ { "id": 13, "result": { "element": {...} } }
+→ { "id": 13, "result": { "element": { "id": 42, "hint": "a", "label": "Save", "role": "AXButton", "desc": "button" } } }
 ```
 
 #### Mode Control
@@ -643,6 +643,10 @@ pub struct RpcError {
 ```
 
 ### C Implementation (Daemon Side)
+
+Current status: a minimal parser is implemented in `src/ipc.c` without cJSON.
+This keeps the footprint small but only supports the simple request shapes
+used by the UI/CLI today.
 
 ```c
 // src/ipc.h
@@ -732,7 +736,10 @@ warpd/
 │   ├── build.rs                      # Build script
 │   └── src/
 │       ├── main.rs                   # Entry point
+│       ├── lib.rs                    # Library exports for CLI + UI
 │       ├── app.rs                    # GPUI Application setup
+│       ├── bin/
+│       │   └── warpd-cli.rs           # IPC CLI for smoke testing
 │       │
 │       ├── ipc/                      # IPC client
 │       │   ├── mod.rs
@@ -781,7 +788,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-gpui = "0.1"                    # GPUI framework
+gpui = "0.2.2"                  # GPUI framework
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["net", "io-util", "sync", "rt-multi-thread"] }
@@ -845,22 +852,25 @@ endif
 **Goal**: Establish IPC communication between daemon and UI
 
 #### 1.1 Daemon IPC Server
-- [ ] Add cJSON dependency for JSON parsing
-- [ ] Implement Unix socket server in `src/ipc.c`
-- [ ] Handle basic methods: `status`, `config.get_all`
-- [ ] Integrate with daemon event loop
+- [x] Implement Unix socket server in `src/ipc.c` (minimal JSON parsing)
+- [x] Handle basic methods: `status`, `config.get_all`, `config.get`,
+      `config.set`, `config.get_schema`
+- [x] Add element methods: `elements.list`, `elements.click`, `elements.focus`
+- [x] Integrate with daemon event loop (background thread)
+- [ ] Add cJSON dependency for full JSON parsing (optional)
 - [ ] Test with netcat/socat
 
 #### 1.2 Rust Project Setup
-- [ ] Create `ui/` directory structure
-- [ ] Set up Cargo.toml with dependencies
-- [ ] Implement IPC client (async socket)
-- [ ] Test round-trip communication
+- [x] Create `ui/` directory structure
+- [x] Set up Cargo.toml with dependencies
+- [x] Implement IPC client (blocking socket for now)
+- [x] Add `warpd-cli` for IPC smoke tests
+- [x] Test round-trip communication
 
 #### 1.3 Build Integration
-- [ ] Create `mk/rust.mk`
-- [ ] Modify main Makefile
-- [ ] Test combined build
+- [x] Create `mk/rust.mk`
+- [x] Modify main Makefile
+- [x] Test combined build
 
 **Deliverable**: `warpd` and `warpd-ui` can exchange messages
 
@@ -902,14 +912,14 @@ endif
 **Goal**: Shortcat-style UI element interaction
 
 #### 3.1 Element Query API
-- [ ] Extend `collect_interactable_hints()` with metadata
-- [ ] Add IPC methods: `elements.list`, `elements.click`, `elements.focus`
+- [x] Extend `collect_interactable_hints()` with metadata (macOS role/title/desc)
+- [x] Add IPC methods: `elements.list`, `elements.click`, `elements.focus`, `elements.info`
 - [ ] Include element type, state, hierarchy info
 
 #### 3.2 Palette Window
 - [ ] Overlay window creation (transparent, always-on-top)
 - [ ] Text input with fuzzy filtering
-- [ ] Element list rendering
+- [x] Basic element list rendering (in UI shell)
 - [ ] Keyboard navigation (up/down, enter)
 
 #### 3.3 Element Type Filtering

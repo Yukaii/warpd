@@ -29,6 +29,32 @@ struct ax_profile {
 
 static struct ax_profile ax_prof;
 
+static void ax_fill_hint_metadata(AXUIElementRef element, struct hint *hint)
+{
+	if (!element || !hint)
+		return;
+
+	hint->title[0] = 0;
+	hint->role[0] = 0;
+	hint->desc[0] = 0;
+
+	ax_copy_string_attr(element, kAXRoleAttribute, hint->role,
+			    sizeof hint->role);
+	if (!ax_copy_string_attr(element, kAXTitleAttribute, hint->title,
+				 sizeof hint->title))
+		if (!ax_copy_string_attr(element, kAXValueAttribute, hint->title,
+					 sizeof hint->title))
+			if (!ax_copy_string_attr(element, kAXDescriptionAttribute,
+						 hint->title,
+						 sizeof hint->title))
+				ax_copy_string_attr(element, kAXHelpAttribute,
+						    hint->title,
+						    sizeof hint->title);
+
+	ax_copy_string_attr(element, kAXRoleDescriptionAttribute, hint->desc,
+			    sizeof hint->desc);
+}
+
 static void ax_profile_begin(void)
 {
 	if (!ax_prof.start_us)
@@ -468,6 +494,7 @@ void ax_collect_interactable_hints(AXUIElementRef element, struct screen *scr,
 			} else {
 				hints[*count].x = x;
 				hints[*count].y = y;
+				ax_fill_hint_metadata(element, &hints[*count]);
 				(*count)++;
 				if (ax_debug_enabled())
 					ax_prof.hints_added++;
@@ -575,6 +602,8 @@ void ax_collect_hints_bfs(AXUIElementRef root, struct screen *scr,
 					} else {
 						hints[*count].x = x;
 						hints[*count].y = y;
+						ax_fill_hint_metadata(element,
+								      &hints[*count]);
 						(*count)++;
 						ax_debug_log_element(element, "MENU", x, y);
 					}
