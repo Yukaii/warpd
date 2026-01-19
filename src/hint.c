@@ -244,7 +244,7 @@ static int sift()
 
 	struct hint hints[MAX_HINTS];
 
-	platform->mouse_get_position(&scr, &x, &y);
+	screen_get_cursor(&scr, &x, &y, 1);
 	platform->screen_get_dimensions(scr, &sw, &sh);
 
 	gap = (gap * sh) / 1000;
@@ -291,58 +291,9 @@ int hintspec_mode()
 	int n = 0;
 	struct hint hints[MAX_HINTS];
 
-	platform->mouse_get_position(&scr, NULL, NULL);
+	screen_get_cursor(&scr, NULL, NULL, 0);
 	platform->screen_get_dimensions(scr, &sw, &sh);
 
-	get_hint_size(scr, &w, &h);
-
-	while (scanf("%15s %d %d", hints[n].label, &hints[n].x, &hints[n].y) ==
-	       3) {
-
-		hints[n].w = w;
-		hints[n].h = h;
-		hints[n].x -= w / 2;
-		hints[n].y -= h / 2;
-
-		n++;
-	}
-
-	return hint_selection(scr, hints, n);
-}
-
-int full_hint_mode(int second_pass)
-{
-	int mx, my;
-	screen_t scr;
-	struct hint hints[MAX_HINTS];
-
-	platform->mouse_get_position(&scr, &mx, &my);
-	hist_add(mx, my);
-
-	nr_hints = generate_fullscreen_hints(scr, hints);
-
-	if (hint_selection(scr, hints, nr_hints))
-		return -1;
-
-	if (second_pass)
-		return sift();
-	else
-		return 0;
-}
-
-static int find_hint_mode_once()
-{
-	int w, h;
-	int sw, sh;
-	size_t n = 0;
-	screen_t scr;
-	struct hint hints[MAX_HINTS];
-
-	if (!platform->collect_interactable_hints)
-		return -1;
-
-	platform->mouse_get_position(&scr, NULL, NULL);
-	platform->screen_get_dimensions(scr, &sw, &sh);
 	get_hint_size(scr, &w, &h);
 
 	n = platform->collect_interactable_hints(scr, hints, MAX_HINTS);
@@ -371,10 +322,73 @@ static int find_hint_mode_once()
 	return hint_selection(scr, hints, n);
 }
 
-int find_hint_mode()
+int full_hint_mode(int second_pass)
 {
-	return find_hint_mode_once();
+	int mx, my;
+	screen_t scr;
+	struct hint hints[MAX_HINTS];
+
+	screen_get_cursor(&scr, &mx, &my, 0);
+	hist_add(mx, my);
+
+	nr_hints = generate_fullscreen_hints(scr, hints);
+
+	if (hint_selection(scr, hints, nr_hints))
+		return -1;
+
+	if (second_pass)
+		return sift();
+	else
+		return 0;
 }
+
+static int find_hint_mode_once()
+{
+	int w, h;
+	int sw, sh;
+	size_t n = 0;
+	screen_t scr;
+	struct hint hints[MAX_HINTS];
+
+	if (!platform->collect_interactable_hints)
+		return -1;
+
+	screen_t prev_screen = screen_get_active();
+	screen_clear_active();
+	screen_get_cursor(&scr, NULL, NULL, 0);
+	platform->screen_get_dimensions(scr, &sw, &sh);
+	get_hint_size(scr, &w, &h);
+
+	n = platform->collect_interactable_hints(scr, hints, MAX_HINTS);
+	if (!n) {
+		screen_set_active(prev_screen);
+		return -1;
+	}
+
+	for (size_t i = 0; i < n; i++) {
+		int max_x = sw - w;
+		int max_y = sh - h;
+		int x = hints[i].x - w / 2;
+		int y = hints[i].y - h / 2;
+
+		if (max_x < 0)
+			max_x = 0;
+		if (max_y < 0)
+			max_y = 0;
+
+		hints[i].w = w;
+		hints[i].h = h;
+		hints[i].x = MIN(max_x, x < 0 ? 0 : x);
+		hints[i].y = MIN(max_y, y < 0 ? 0 : y);
+	}
+
+	screen_set_active(prev_screen);
+	generate_hint_labels(hints, n, config_get("hint_chars"));
+
+	return hint_selection(scr, hints, n);
+}
+
+int find_hint_mode() { return find_hint_mode_once(); }
 
 int find_hint_mode_sticky()
 {
@@ -385,7 +399,8 @@ int find_hint_mode_sticky()
 			screen_t scr;
 			int x, y;
 
-			platform->mouse_get_position(&scr, &x, &y);
+			screen_get_cursor(&scr, &x, &y, 1);
+
 			hist_add(x, y);
 			histfile_add(x, y);
 			if (platform->trigger_ripple)
@@ -406,7 +421,7 @@ int history_hint_mode()
 	int sw, sh;
 	size_t n, i;
 
-	platform->mouse_get_position(&scr, NULL, NULL);
+	screen_get_cursor(&scr, NULL, NULL, 0);
 	platform->screen_get_dimensions(scr, &sw, &sh);
 
 	n = histfile_read(&ents);

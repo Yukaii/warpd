@@ -326,23 +326,71 @@ int ax_element_center_for_screen(AXUIElementRef element, struct screen *scr,
 	if (size.width <= 0 || size.height <= 0)
 		return 0;
 
-	float global_x = position.x + size.width / 2.0f;
-	float global_y = position.y + size.height / 2.0f;
+	float raw_global_x = position.x + size.width / 2.0f;
+	float raw_global_y = position.y + size.height / 2.0f;
+	float local_x_candidate = raw_global_x;
+	float local_y_candidate = raw_global_y;
+	int using_local = 0;
 
-	if (window_frame) {
-		if (global_x < window_frame->origin.x ||
-		    global_x > (window_frame->origin.x + window_frame->size.width) ||
-		    global_y < window_frame->origin.y ||
-		    global_y > (window_frame->origin.y + window_frame->size.height))
-			return 0;
+	if (local_x_candidate < 0) {
+		float wrapped_x = scr->w + local_x_candidate;
+		if (wrapped_x >= 0 && wrapped_x <= scr->w)
+			local_x_candidate = wrapped_x;
 	}
 
-	if (global_x < scr->x || global_x > (scr->x + scr->w) ||
-	    global_y < scr->y || global_y > (scr->y + scr->h))
-		return 0;
+	if (local_y_candidate < 0) {
+		float wrapped_y = scr->h + local_y_candidate;
+		if (wrapped_y >= 0 && wrapped_y <= scr->h)
+			local_y_candidate = wrapped_y;
+	}
 
-	local_x = global_x - scr->x;
-	local_y = global_y - scr->y;
+	if (local_x_candidate >= 0 && local_x_candidate <= scr->w &&
+	    local_y_candidate >= 0 && local_y_candidate <= scr->h) {
+		using_local = 1;
+		local_x = local_x_candidate;
+		local_y = local_y_candidate;
+	} else {
+		float global_x = raw_global_x;
+		float global_y = raw_global_y;
+		float alt_global_x = global_x + scr->x;
+		float alt_global_y = global_y + scr->y;
+		int in_screen = !(global_x < scr->x || global_x > (scr->x + scr->w) ||
+				  global_y < scr->y || global_y > (scr->y + scr->h));
+		int alt_in_screen = !(alt_global_x < scr->x || alt_global_x > (scr->x + scr->w) ||
+				      alt_global_y < scr->y || alt_global_y > (scr->y + scr->h));
+
+		if (!in_screen && alt_in_screen) {
+			global_x = alt_global_x;
+			global_y = alt_global_y;
+			in_screen = 1;
+		}
+
+		if (window_frame && in_screen) {
+			if (global_x < window_frame->origin.x ||
+			    global_x > (window_frame->origin.x + window_frame->size.width) ||
+			    global_y < window_frame->origin.y ||
+			    global_y > (window_frame->origin.y + window_frame->size.height)) {
+				float frame_dx = window_frame->origin.x - scr->x;
+				float frame_dy = window_frame->origin.y - scr->y;
+				float shifted_x = global_x - frame_dx;
+				float shifted_y = global_y - frame_dy;
+
+				if (shifted_x >= scr->x && shifted_x <= (scr->x + scr->w) &&
+				    shifted_y >= scr->y && shifted_y <= (scr->y + scr->h)) {
+					global_x = shifted_x;
+					global_y = shifted_y;
+				} else {
+					return 0;
+				}
+			}
+		}
+
+		if (!in_screen)
+			return 0;
+
+		local_x = global_x - scr->x;
+		local_y = global_y - scr->y;
+	}
 
 	*center_x = (int)lroundf(local_x);
 	*center_y = (int)lroundf(local_y);

@@ -1,5 +1,43 @@
 #include "warpd.h"
 
+static screen_t active_screen = NULL;
+
+void screen_set_active(screen_t scr) { active_screen = scr; }
+
+screen_t screen_get_active(void) { return active_screen; }
+
+void screen_clear_active(void) { active_screen = NULL; }
+
+void screen_get_cursor(screen_t *scr, int *x, int *y, int warp_to_active)
+{
+	screen_t active = screen_get_active();
+	screen_t current = NULL;
+	int cx = 0;
+	int cy = 0;
+
+	platform->mouse_get_position(&current, &cx, &cy);
+
+	if (active) {
+		if (current != active && warp_to_active) {
+			int w, h;
+			platform->screen_get_dimensions(active, &w, &h);
+			cx = w / 2;
+			cy = h / 2;
+			platform->mouse_move(active, cx, cy);
+			current = active;
+		}
+		if (!warp_to_active)
+			current = active;
+	}
+
+	if (scr)
+		*scr = current;
+	if (x)
+		*x = cx;
+	if (y)
+		*y = cy;
+}
+
 void screen_selection_mode()
 {
 	size_t i;
@@ -43,7 +81,8 @@ void screen_selection_mode()
 		if (key[0] == screen_chars[i] && key[1] == 0) {
 			int w, h;
 			platform->screen_get_dimensions(screens[i], &w, &h);
-			platform->mouse_move(screens[i], w/2, h/2);
+			platform->mouse_move(screens[i], w / 2, h / 2);
+			screen_set_active(screens[i]);
 		}
 	}
 

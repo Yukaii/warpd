@@ -160,7 +160,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 
 	platform->input_grab_keyboard();
 
-	platform->mouse_get_position(&scr, &mx, &my);
+	screen_get_cursor(&scr, &mx, &my, 1);
 	platform->screen_get_dimensions(scr, &sw, &sh);
 
 	if (!system_cursor)
@@ -186,7 +186,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			start_ev = NULL;
 		}
 
-		platform->mouse_get_position(&scr, &mx, &my);
+		screen_get_cursor(&scr, &mx, &my, 0);
 
 		if (!system_cursor && on_time) {
 			if (show_cursor &&
@@ -494,7 +494,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			}
 		}
 	next:
-		platform->mouse_get_position(&scr, &mx, &my);
+		screen_get_cursor(&scr, &mx, &my, 0);
 
 		platform->commit();
 	}

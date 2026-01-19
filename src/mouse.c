@@ -49,7 +49,7 @@ static void update_cursor_position()
 {
 	int ix, iy;
 
-	platform->mouse_get_position(&scr, &ix, &iy);
+	screen_get_cursor(&scr, &ix, &iy, 1);
 	platform->screen_get_dimensions(scr, &sw, &sh);
 
 	cx = (double)ix;
@@ -217,7 +217,6 @@ void mouse_reset()
 	down = 0;
 	a = a0;
 	v = v0;
-
 	update_cursor_position();
 
 	tick();

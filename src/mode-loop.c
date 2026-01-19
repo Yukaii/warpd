@@ -48,20 +48,30 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 			}
 
 			break;
-		case MODE_FIND:
-			if (find_hint_mode() < 0)
+		case MODE_FIND: {
+			screen_t prev_screen = screen_get_active();
+			if (find_hint_mode() < 0) {
+				screen_set_active(prev_screen);
 				goto exit;
+			}
 
+			screen_set_active(prev_screen);
 			ev = NULL;
 			mode = MODE_NORMAL;
 			break;
-		case MODE_FIND_STICKY:
-			if (find_hint_mode_sticky() < 0)
+		}
+		case MODE_FIND_STICKY: {
+			screen_t prev_screen = screen_get_active();
+			if (find_hint_mode_sticky() < 0) {
+				screen_set_active(prev_screen);
 				goto exit;
+			}
 
+			screen_set_active(prev_screen);
 			ev = NULL;
 			mode = MODE_NORMAL;
 			break;
+		}
 		case MODE_HINT2:
 		case MODE_HINT:
 			if (full_hint_mode(mode == MODE_HINT2) < 0)
@@ -78,8 +88,8 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 			break;
 		case MODE_SCREEN_SELECTION:
 			screen_selection_mode();
-			mode = MODE_NORMAL;
 			ev = NULL;
+			mode = MODE_NORMAL;
 			break;
 		}
 
@@ -88,8 +98,7 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 			int x, y;
 			screen_t scr;
 
-			platform->mouse_get_position(&scr, NULL, NULL);
-			platform->mouse_get_position(NULL, &x, &y);
+			screen_get_cursor(&scr, &x, &y, 0);
 
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, x, y);

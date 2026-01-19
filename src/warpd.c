@@ -6,6 +6,10 @@
 
 #include "warpd.h"
 
+#ifndef VERSION
+#define VERSION "unknown"
+#endif
+
 struct platform *platform = NULL;
 
 static const char *config_path;
@@ -141,7 +145,10 @@ static void print_usage()
 	printf("%s", usage);
 }
 
-static void print_version() { printf("warpd " VERSION "\n"); }
+static void print_version()
+{
+	printf("warpd %s\n", VERSION);
+}
 
 static int drag_flag = 0;
 static int oneshot_flag = 0;
@@ -162,7 +169,7 @@ int oneshot_main(struct platform *_platform)
 	init_mouse();
 	init_hints();
 
-	platform->mouse_get_position(&scr, NULL, NULL);
+	screen_get_cursor(&scr, NULL, NULL, 0);
 	if (x_flag == -1 && y_flag == -1) {
 		if (drag_flag)
 			platform->mouse_down(config_get_int("drag_button"));
@@ -321,7 +328,7 @@ int main(int argc, char *argv[])
 			daemonize();
 
 		setvbuf(stdout, NULL, _IOLBF, 0);
-		printf("Starting warpd " VERSION "\n");
+		printf("Starting warpd %s\n", VERSION);
 
 		platform_run(daemon_main);
 	}

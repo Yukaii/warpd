@@ -84,7 +84,7 @@ struct input_event *grid_mode()
 	platform->mouse_hide();
 	mouse_reset();
 
-	platform->mouse_get_position(&scr, NULL, NULL);
+	screen_get_cursor(&scr, NULL, NULL, 1);
 	platform->screen_get_dimensions(scr, &grid_width, &grid_height);
 
 	mx = grid_width / 2;
@@ -109,7 +109,7 @@ struct input_event *grid_mode()
 		int idx;
 
 		ev = platform->input_next_event(10);
-		platform->mouse_get_position(NULL, &mx, &my);
+		screen_get_cursor(NULL, &mx, &my, 0);
 
 		if (mouse_process_key(ev, "grid_up", "grid_down", "grid_left",
 				      "grid_right")) {
@@ -201,7 +201,7 @@ struct input_event *grid_mode()
 
 		if (config_input_match(ev, "buttons") ||
 		    config_input_match(ev, "oneshot_buttons")) {
-			platform->mouse_get_position(NULL, &mx, &my);
+			screen_get_cursor(NULL, &mx, &my, 0);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, mx, my);
 			goto exit;

@@ -96,6 +96,10 @@ int full_hint_mode(int second_pass);
 int find_hint_mode();
 int find_hint_mode_sticky();
 void screen_selection_mode();
+void screen_set_active(screen_t scr);
+screen_t screen_get_active(void);
+void screen_clear_active(void);
+void screen_get_cursor(screen_t *scr, int *x, int *y, int warp_to_active);
 struct input_event *grid_mode();
 struct input_event *normal_mode(struct input_event *start_ev, int oneshot);
 
