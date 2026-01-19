@@ -11,6 +11,7 @@ struct hint matched[MAX_HINTS];
 
 static size_t nr_hints;
 static size_t nr_matched;
+static int hint_selected;
 
 char last_selected_hint[32];
 
@@ -134,6 +135,7 @@ static int hint_selection(screen_t scr, struct hint *_hints, size_t _nr_hints)
 {
 	hints = _hints;
 	nr_hints = _nr_hints;
+	hint_selected = 0;
 
 	filter(scr, "");
 
@@ -207,6 +209,7 @@ static int hint_selection(screen_t scr, struct hint *_hints, size_t _nr_hints)
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, nx, ny);
 			strcpy(last_selected_hint, buf);
+			hint_selected = 1;
 			break;
 		} else if (nr_matched == 0) {
 			break;
@@ -327,7 +330,7 @@ int full_hint_mode(int second_pass)
 		return 0;
 }
 
-int find_hint_mode()
+static int find_hint_mode_once()
 {
 	int w, h;
 	int sw, sh;
@@ -366,6 +369,32 @@ int find_hint_mode()
 	generate_hint_labels(hints, n, config_get("hint_chars"));
 
 	return hint_selection(scr, hints, n);
+}
+
+int find_hint_mode()
+{
+	return find_hint_mode_once();
+}
+
+int find_hint_mode_sticky()
+{
+	while (1) {
+		if (find_hint_mode_once() < 0)
+			return -1;
+		if (hint_selected) {
+			screen_t scr;
+			int x, y;
+
+			platform->mouse_get_position(&scr, &x, &y);
+			hist_add(x, y);
+			histfile_add(x, y);
+			if (platform->trigger_ripple)
+				platform->trigger_ripple(scr, x, y);
+			platform->mouse_click(1);
+		}
+	}
+
+	return 0;
 }
 
 int history_hint_mode()

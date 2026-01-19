@@ -32,6 +32,8 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 				mode = MODE_HINT2;
 			else if (config_input_match(ev, "find"))
 				mode = MODE_FIND;
+			else if (config_input_match(ev, "find_sticky"))
+				mode = MODE_FIND_STICKY;
 			else if (config_input_match(ev, "grid"))
 				mode = MODE_GRID;
 			else if (config_input_match(ev, "screen"))
@@ -48,6 +50,13 @@ int mode_loop(int initial_mode, int oneshot, int record_history)
 			break;
 		case MODE_FIND:
 			if (find_hint_mode() < 0)
+				goto exit;
+
+			ev = NULL;
+			mode = MODE_NORMAL;
+			break;
+		case MODE_FIND_STICKY:
+			if (find_hint_mode_sticky() < 0)
 				goto exit;
 
 			ev = NULL;

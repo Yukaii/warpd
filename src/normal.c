@@ -132,6 +132,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 	    "end",
 	    "exit",
 	    "find",
+	    "find_sticky",
 	    "grid",
 	    "hint",
 	    "hint2",
@@ -232,7 +233,9 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				redraw(scr, mx, my, !show_cursor, rapid_mode);
 			}
 			continue;
-		} else if (config_input_match(ev, "scroll_down")) {
+		}
+
+		if (config_input_match(ev, "scroll_down")) {
 
 			redraw(scr, mx, my, 1, rapid_mode);
 
@@ -437,6 +440,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			goto exit;
 		} else if (config_input_match(ev, "exit") ||
 			   config_input_match(ev, "find") ||
+			   config_input_match(ev, "find_sticky") ||
 			   config_input_match(ev, "grid") ||
 			   config_input_match(ev, "screen") ||
 			   config_input_match(ev, "history") ||

@@ -53,11 +53,12 @@ int input_parse_string(struct input_event *ev, const char *s)
 		 * keyboard layout (e.g., Hebrew, Russian, Arabic).
 		 */
 		if (s[1] == 0 && s[0] >= ' ' && s[0] <= '~') {
-			ev->code = platform->input_qwerty_to_code(s[0]);
-			/* Handle uppercase letters - map to lowercase and set shift */
-			if (!ev->code && s[0] >= 'A' && s[0] <= 'Z') {
-				ev->code = platform->input_qwerty_to_code(s[0] - 'A' + 'a');
+			if (s[0] >= 'A' && s[0] <= 'Z') {
+				ev->code = platform->input_qwerty_to_code(
+				    s[0] - 'A' + 'a');
 				shifted = 1;
+			} else {
+				ev->code = platform->input_qwerty_to_code(s[0]);
 			}
 		}
 

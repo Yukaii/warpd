@@ -103,6 +103,8 @@ the author's opinion) superior to grid mode for quickly pinpointing elements.
 Find mode limits hints to interactable elements like buttons, links, and labels
 using the macOS Accessibility API. It behaves like hint mode once a target is
 selected, but may be unavailable if accessibility permissions are not granted.
+Press 'F' within normal mode to enable sticky find mode, which stays active
+until 'esc'.
 
 For finer movements, a two phase hint mode can be activated by pressing 'X'
 within normal mode.

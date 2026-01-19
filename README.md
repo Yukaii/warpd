@@ -169,6 +169,7 @@ launchctl unload /Library/LaunchAgents/com.warpd.warpd.plist
 ## Find Mode (macOS)
 2. Press `A-M-f` (`alt+meta+f`) to show hints over interactable elements
 3. Enter the key sequence to warp the pointer to that element and enter normal mode.
+4. Press `F` within normal mode for sticky find mode, which stays active until `esc`.
 
 ## Grid Mode
 2. Press `A-M-g` (meta is the command key) to activate the warping process.
@@ -270,6 +271,7 @@ Press `rapid_mode` (default `R`) to toggle rapid clicks, then press a mouse butt
 | `x` | Hint Mode | Switch to hint mode |
 | `X` | Hint Mode (2-pass) | Switch to two-pass hint mode |
 | `f` | Find Mode | Switch to interactable hints (macOS) |
+| `F` | Find Mode (sticky) | Keep find mode active until `esc` (macOS) |
 | `g` | Grid Mode | Switch to grid mode |
 | `s` | Screen Selection | Select different screen |
 | `;` | History Mode | Show hint history |
