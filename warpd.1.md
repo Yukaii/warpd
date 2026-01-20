@@ -48,6 +48,26 @@ Mode Flags:
 
 	*--record*: When used with --click, adds the click event to warpd's history.
 
+# MACOS URL SCHEME
+
+On macOS, warpd installs a small URL handler app that registers the
+*warpd://* scheme. Use it to trigger modes from scripts or shortcuts.
+
+Examples:
+
+```
+open "warpd://hint"
+open "warpd://grid?oneshot=1"
+open "warpd://normal"
+```
+
+If the handler is not yet registered, run:
+
+```
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -f /usr/local/share/warpd/warpd-url-handler.app
+```
+
 # DESCRIPTION
 
 warpd has four main modes which can be used to manipulate the pointer. The

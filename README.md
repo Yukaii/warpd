@@ -157,6 +157,29 @@ The service can be disabled with
 launchctl unload /Library/LaunchAgents/com.warpd.warpd.plist
 ```
 
+### Deep Links (macOS)
+
+warpd ships a small URL handler app that registers the `warpd://` scheme so you
+can trigger modes from links, scripts, or Shortcuts.
+
+After installing, register it with LaunchServices (adjust the prefix for
+Apple Silicon if needed):
+
+```bash
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -f /usr/local/share/warpd/warpd-url-handler.app
+```
+
+On Apple Silicon Homebrew, the path is usually `/opt/homebrew/share/warpd/warpd-url-handler.app`.
+
+Examples:
+
+```bash
+open "warpd://hint"
+open "warpd://grid?oneshot=1"
+open "warpd://normal"
+```
+
 # Quickstart
 
 1. Run `warpd`
