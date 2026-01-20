@@ -97,6 +97,8 @@ for manipulating popup menus and selecting text (see _Dragging_). The default
 behaviour is vi-like. Pressing the mapped directional keys (default hjkl) moves
 the cursor in a continuous fashion, but the pointer can also be warped to the edges
 of the screen using the home (_H_), middle (_M_), and last (_L_) mappings.
+For larger horizontal steps, use _w_ and _b_ (configurable via
+*normal_large_step*).
 Finally, a numeric multiplier can be supplied to the
 directional keys as an input prefix in order to move the cursor by a
 proportional increment in the given direction (e.g 10j moves 10 units down). 

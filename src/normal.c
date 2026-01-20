@@ -144,6 +144,8 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 	    "oneshot_buttons",
 	    "print",
 	    "right",
+	    "word_left",
+	    "word_right",
 	    "screen",
 	    "scroll_down",
 	    "scroll_end",
@@ -389,7 +391,27 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			goto next;
 		}
 
-		if (config_input_match(ev, "top")) {
+		if (config_input_match(ev, "word_left")) {
+			int step = config_get_int("normal_large_step");
+			int nx = mx - step;
+			const int minx = 1;
+			const int maxx = sw - cursz;
+			if (nx < minx)
+				nx = minx;
+			if (nx > maxx)
+				nx = maxx;
+			move(scr, nx, my, !show_cursor, rapid_mode);
+		} else if (config_input_match(ev, "word_right")) {
+			int step = config_get_int("normal_large_step");
+			int nx = mx + step;
+			const int minx = 1;
+			const int maxx = sw - cursz;
+			if (nx < minx)
+				nx = minx;
+			if (nx > maxx)
+				nx = maxx;
+			move(scr, nx, my, !show_cursor, rapid_mode);
+		} else if (config_input_match(ev, "top")) {
 			move(scr, mx, cursz / 2, !show_cursor, rapid_mode);
 			if (platform->trigger_ripple)
 				platform->trigger_ripple(scr, mx, cursz / 2);

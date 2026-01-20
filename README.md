@@ -238,6 +238,8 @@ A more comprehensive description can be found in the [man page](warpd.1.md) (alo
 | `j` | Move Down | Move cursor down |
 | `k` | Move Up | Move cursor up |
 | `l` | Move Right | Move cursor right |
+| `b` | Large Step Left | Move cursor left by a large step (`normal_large_step`) |
+| `w` | Large Step Right | Move cursor right by a large step (`normal_large_step`) |
 | `H` | Jump to Top | Move cursor to top of screen |
 | `M` | Jump to Middle | Move cursor to middle of screen |
 | `L` | Jump to Bottom | Move cursor to bottom of screen |
