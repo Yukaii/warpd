@@ -237,7 +237,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			continue;
 		}
 
-		if (config_input_match(ev, "scroll_down")) {
+		if (config_input_match_loose(ev, "scroll_down")) {
 
 			redraw(scr, mx, my, 1, rapid_mode);
 
@@ -246,7 +246,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				scroll_accelerate(SCROLL_DOWN);
 			} else
 				scroll_decelerate();
-		} else if (config_input_match(ev, "scroll_up")) {
+		} else if (config_input_match_loose(ev, "scroll_up")) {
 			redraw(scr, mx, my, 1, rapid_mode);
 
 			if (ev->pressed) {
@@ -254,7 +254,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				scroll_accelerate(SCROLL_UP);
 			} else
 				scroll_decelerate();
-		} else if (config_input_match(ev, "scroll_left")) {
+		} else if (config_input_match_loose(ev, "scroll_left")) {
 			redraw(scr, mx, my, 1, rapid_mode);
 
 			if (ev->pressed) {
@@ -262,7 +262,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				scroll_accelerate(SCROLL_LEFT);
 			} else
 				scroll_decelerate();
-		} else if (config_input_match(ev, "scroll_right")) {
+		} else if (config_input_match_loose(ev, "scroll_right")) {
 			redraw(scr, mx, my, 1, rapid_mode);
 
 			if (ev->pressed) {
@@ -270,7 +270,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				scroll_accelerate(SCROLL_RIGHT);
 			} else
 				scroll_decelerate();
-		} else if (config_input_match(ev, "scroll_page_down")) {
+		} else if (config_input_match_loose(ev, "scroll_page_down")) {
 			if (ev->pressed) {
 				int amount =
 				    config_get_int("scroll_page_amount");
@@ -278,7 +278,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				redraw(scr, mx, my, 1, rapid_mode);
 				platform->scroll_amount(SCROLL_DOWN, amount);
 			}
-		} else if (config_input_match(ev, "scroll_page_up")) {
+		} else if (config_input_match_loose(ev, "scroll_page_up")) {
 			if (ev->pressed) {
 				int amount =
 				    config_get_int("scroll_page_amount");
@@ -286,7 +286,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 				redraw(scr, mx, my, 1, rapid_mode);
 				platform->scroll_amount(SCROLL_UP, amount);
 			}
-		} else if (config_input_match(ev, "scroll_home")) {
+		} else if (config_input_match_loose(ev, "scroll_home")) {
 			if (ev->pressed) {
 				scroll_stop();
 				redraw(scr, mx, my, 1, rapid_mode);
@@ -304,7 +304,7 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 								amount);
 				}
 			}
-		} else if (config_input_match(ev, "scroll_end")) {
+		} else if (config_input_match_loose(ev, "scroll_end")) {
 			if (ev->pressed) {
 				scroll_stop();
 				redraw(scr, mx, my, 1, rapid_mode);

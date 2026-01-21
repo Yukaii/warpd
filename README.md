@@ -285,7 +285,7 @@ A more comprehensive description can be found in the [man page](warpd.1.md) (alo
 | `v` | Toggle Drag Mode | Enter/exit visual (drag) mode |
 | `c` | Copy & Exit | Send copy command and exit |
 
-Mouse button bindings accept modifier prefixes like `M-m` (Cmd+left click) or `C-S-.` (Ctrl+Shift+right click). Use multiple `buttons:` lines if you want both modified and unmodified bindings for the same mouse button.
+Mouse button bindings accept modifier prefixes like `M-m` (Cmd+left click) or `C-S-.` (Ctrl+Shift+right click). Scroll bindings accept modifiers as well (e.g. `C-r` for Ctrl+scroll up). Use multiple bindings if you want both modified and unmodified behavior.
 
 Press `rapid_mode` (default `R`) to toggle rapid clicks, then press a mouse button key to start auto-clicking. Press `rapid_mode` again or hit `esc` to stop. Use `rapid_click_interval` to control speed.
 

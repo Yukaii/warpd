@@ -113,6 +113,7 @@ const char *input_event_tostr(struct input_event *ev);
 int input_eq(struct input_event *ev, const char *str);
 int input_parse_string(struct input_event *ev, const char *s);
 int config_input_match(struct input_event *ev, const char *str);
+int config_input_match_loose(struct input_event *ev, const char *str);
 
 size_t hist_hints(struct hint *hints, int w, int h);
 

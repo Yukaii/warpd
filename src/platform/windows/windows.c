@@ -3,6 +3,7 @@
 #include "windows.h"
 
 static int keyboard_grabbed = 0;
+static uint8_t active_mods = 0;
 
 static struct input_event *grab_events;
 static size_t ngrab_events;
@@ -52,6 +53,7 @@ static LRESULT CALLBACK keyboardHook(int nCode, WPARAM wParam, LPARAM lParam)
 		  ? PLATFORM_MOD_META
 		  : 0));
 
+	active_mods = mods;
 	PostMessage(NULL, WM_KEY_EVENT, pressed << 16 | mods << 8 | code, 0);
 
 	if (is_grabbed_key(code, mods))
@@ -242,8 +244,25 @@ static void scroll(int direction)
 	DWORD delta = -(DWORD)((float)WHEEL_DELTA / 2.5);
 	if (direction == SCROLL_UP)
 		delta *= -1;
+	if (active_mods & PLATFORM_MOD_SHIFT)
+		keybd_event(VK_SHIFT, 0, 0, 0);
+	if (active_mods & PLATFORM_MOD_CONTROL)
+		keybd_event(VK_CONTROL, 0, 0, 0);
+	if (active_mods & PLATFORM_MOD_META)
+		keybd_event(VK_LWIN, 0, 0, 0);
+	if (active_mods & PLATFORM_MOD_ALT)
+		keybd_event(VK_MENU, 0, 0, 0);
 
 	mouse_event(MOUSEEVENTF_WHEEL, 0, 0, delta, 0);
+
+	if (active_mods & PLATFORM_MOD_SHIFT)
+		keybd_event(VK_SHIFT, 0, KEYEVENTF_KEYUP, 0);
+	if (active_mods & PLATFORM_MOD_CONTROL)
+		keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+	if (active_mods & PLATFORM_MOD_META)
+		keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+	if (active_mods & PLATFORM_MOD_ALT)
+		keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0);
 }
 
 static const char *input_lookup_name(uint8_t code, int shifted)

@@ -534,6 +534,36 @@ int config_input_match(struct input_event *ev, const char *config_key)
 	return 0;
 }
 
+int config_input_match_loose(struct input_event *ev, const char *config_key)
+{
+	struct config_entry *ent;
+
+	for (ent = config; ent; ent = ent->next) {
+		int idx;
+		int exact;
+
+		if (!strcmp(ent->key, config_key) &&
+		    !strcmp(ent->value, "unbind"))
+			return 0;
+
+		if (ent->whitelisted &&
+		    (idx = keyidx(ent->value, ev, &exact))) {
+			if (!strcmp(ent->key, config_key)) {
+				if (ent->type == OPT_KEY ||
+				    ent->type == OPT_BUTTON)
+					return idx;
+				return 0;
+			}
+
+			if ((ent->type == OPT_KEY && exact) ||
+			    ent->type == OPT_BUTTON)
+				return 0;
+		}
+	}
+
+	return 0;
+}
+
 void config_print_options()
 {
 	size_t i;

@@ -946,6 +946,7 @@ void osx_scroll(int direction)
 {
 	int y = 0;
 	int x = 0;
+	CGEventFlags flags = 0;
 
 	switch (direction) {
 	case SCROLL_UP:
@@ -962,8 +963,18 @@ void osx_scroll(int direction)
 		break;
 	}
 
+	if (active_mods & PLATFORM_MOD_META)
+		flags |= kCGEventFlagMaskCommand;
+	if (active_mods & PLATFORM_MOD_ALT)
+		flags |= kCGEventFlagMaskAlternate;
+	if (active_mods & PLATFORM_MOD_CONTROL)
+		flags |= kCGEventFlagMaskControl;
+	if (active_mods & PLATFORM_MOD_SHIFT)
+		flags |= kCGEventFlagMaskShift;
+
 	CGEventRef ev = CGEventCreateScrollWheelEvent(
 	    NULL, kCGScrollEventUnitPixel, 2, y, x);
+	CGEventSetFlags(ev, flags);
 	CGEventPost(kCGHIDEventTap, ev);
 }
 
@@ -971,6 +982,7 @@ void osx_scroll_amount(int direction, int amount)
 {
 	int y = 0;
 	int x = 0;
+	CGEventFlags flags = 0;
 
 	switch (direction) {
 	case SCROLL_UP:
@@ -987,8 +999,18 @@ void osx_scroll_amount(int direction, int amount)
 		break;
 	}
 
+	if (active_mods & PLATFORM_MOD_META)
+		flags |= kCGEventFlagMaskCommand;
+	if (active_mods & PLATFORM_MOD_ALT)
+		flags |= kCGEventFlagMaskAlternate;
+	if (active_mods & PLATFORM_MOD_CONTROL)
+		flags |= kCGEventFlagMaskControl;
+	if (active_mods & PLATFORM_MOD_SHIFT)
+		flags |= kCGEventFlagMaskShift;
+
 	CGEventRef ev = CGEventCreateScrollWheelEvent(
 	    NULL, kCGScrollEventUnitPixel, 2, y, x);
+	CGEventSetFlags(ev, flags);
 	CGEventPost(kCGHIDEventTap, ev);
 }
 

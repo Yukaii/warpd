@@ -340,7 +340,6 @@ static void _send_key(uint8_t code, int pressed)
 	/* quartz inspects the event flags instead of maintaining its own state */
 	if (command_down)
 		CGEventSetFlags(ev, kCGEventFlagMaskCommand);
-
 	CGEventPost(kCGHIDEventTap, ev);
 	CFRelease(ev);
 }
