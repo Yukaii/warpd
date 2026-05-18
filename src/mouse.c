@@ -192,7 +192,11 @@ int mouse_process_key(struct input_event *ev, const char *up_key,
 	return ret;
 }
 
-void mouse_fast() { a = a1; }
+void mouse_fast()
+{
+	a = a1;
+	mode_slow = 0;
+}
 
 void mouse_normal()
 {
@@ -217,6 +221,7 @@ void mouse_reset()
 	down = 0;
 	a = a0;
 	v = v0;
+	mode_slow = 0;
 	update_cursor_position();
 
 	tick();

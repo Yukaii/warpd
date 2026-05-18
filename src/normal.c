@@ -330,7 +330,10 @@ struct input_event *normal_mode(struct input_event *start_ev, int oneshot)
 			else
 				mouse_normal();
 		} else if (config_input_match(ev, "decelerator")) {
-			mouse_slow();
+			if (ev->pressed)
+				mouse_slow();
+			else
+				mouse_normal();
 		}
 
 		if (config_input_match(ev, "rapid_mode") && ev->pressed) {
