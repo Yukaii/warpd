@@ -210,15 +210,6 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type,
 		return nil;
 	}
 
-	if (grabbed_keys && is_modifier_event) {
-		for (i = 0; i < grabbed_keys_sz; i++) {
-			if (grabbed_keys[i].mods == active_mods) {
-				blocked_mods = active_mods;
-				return nil;
-			}
-		}
-	}
-
 	if (grabbed && !is_modifier_event) {
 		/* If the keydown occurred before the grab, allow the keyup to pass through. */
 		if (pressed || pressed_timestamps[code] > grabbed_time) {
