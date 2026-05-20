@@ -14,6 +14,8 @@ static struct input_event *grabbed_keys;
 static size_t grabbed_keys_sz = 0;
 
 static uint8_t passthrough_keys[256] = {0};
+/* Suppress the activation chord so it doesn't leak into the app. */
+static uint8_t blocked_mods = 0;
 
 static CFMachPortRef tap;
 
@@ -196,8 +198,26 @@ static CGEventRef eventTapCallback(CGEventTapProxy proxy, CGEventType type,
 		    grabbed_keys[i].mods == active_mods) {
 			grabbed = 1;
 			grabbed_time = get_time_ms();
+			blocked_mods = active_mods;
 			return nil;
 		}
+
+	if (blocked_mods) {
+		if ((active_mods & blocked_mods) == blocked_mods)
+			return nil;
+
+		blocked_mods = 0;
+		return nil;
+	}
+
+	if (grabbed_keys && is_modifier_event) {
+		for (i = 0; i < grabbed_keys_sz; i++) {
+			if (grabbed_keys[i].mods == active_mods) {
+				blocked_mods = active_mods;
+				return nil;
+			}
+		}
+	}
 
 	if (grabbed && !is_modifier_event) {
 		/* If the keydown occurred before the grab, allow the keyup to pass through. */
