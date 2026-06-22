@@ -92,6 +92,10 @@ struct screen {
 	int x;
 	int y;
 
+	/* CoreGraphics global ULO */
+	int cg_x;
+	int cg_y;
+
 	int w;
 	int h;
 
@@ -162,6 +166,7 @@ void osx_mouse_get_position(screen_t *scr, int *x, int *y);
 void osx_mouse_show();
 void osx_mouse_hide();
 void osx_screen_get_dimensions(screen_t scr, int *w, int *h);
+void osx_screen_ensure_overlay(screen_t scr);
 void osx_screen_draw_box(screen_t scr, int x, int y, int w, int h,
 			 const char *color);
 int osx_screen_draw_cursor(screen_t scr, int x, int y);

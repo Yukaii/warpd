@@ -32,8 +32,11 @@
 
 void window_show(struct window *win)
 {
-	[win->win makeKeyAndOrderFront:nil];
-	[[win->win contentView] setNeedsDisplay:TRUE];
+	NSView *view = [win->win contentView];
+	[view setFrame:[[win->win contentView] bounds]];
+	[win->win orderFrontRegardless];
+	[view setNeedsDisplay:YES];
+	[view displayIfNeeded];
 }
 
 void window_register_draw_hook(struct window *win, void (*draw)(void *arg, NSView *view), void *arg)
@@ -75,13 +78,15 @@ struct window *create_overlay_window(int x, int y, int w, int h)
 	 * the implicitly provided graphics context.
 	 */
 
-	MainView *view = [[MainView alloc] init];
+	MainView *view = [[MainView alloc] initWithFrame:NSMakeRect(0, 0, (float)w, (float)h)];
 	view.win = win;
+	[view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
 
 	[nsWin setContentView:view];
 
 	[nsWin setBackgroundColor:[NSColor clearColor]];
-	[nsWin makeKeyAndOrderFront:nil];
+	[nsWin setOpaque:NO];
+	[nsWin setIgnoresMouseEvents:YES];
 	[nsWin setLevel:NSMainMenuWindowLevel + 999];
 
 	win->win = nsWin;

@@ -1021,6 +1021,9 @@ void osx_commit()
 		for (i = 0; i < nr_screens; i++) {
 			struct window *win = screens[i].overlay;
 
+			if (!win)
+				continue;
+
 			if (win->nr_hooks)
 				window_show(win);
 			else

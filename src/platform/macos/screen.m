@@ -127,12 +127,18 @@ static int load_cursor_pack(const char *cursor_pack)
 
 static void refresh_screen_list_on_main()
 {
-	struct screen old_screens[MAX_SCREENS];
+	struct {
+		uint32_t display_id;
+		struct window *overlay;
+	} old_screens[MAX_SCREENS];
 	size_t old_nr_screens = nr_screens;
 	size_t new_nr_screens = 0;
 	int used_old[MAX_SCREENS] = {0};
 
-	memcpy(old_screens, screens, sizeof(old_screens));
+	for (size_t i = 0; i < old_nr_screens; i++) {
+		old_screens[i].display_id = screens[i].display_id;
+		old_screens[i].overlay = screens[i].overlay;
+	}
 	memset(screens, 0, sizeof(screens));
 
 	for (NSScreen *screen in NSScreen.screens) {
@@ -146,7 +152,7 @@ static void refresh_screen_list_on_main()
 
 		for (size_t i = 0; i < old_nr_screens; i++) {
 			if (!used_old[i] && old_screens[i].display_id == display_id) {
-				*scr = old_screens[i];
+				scr->overlay = old_screens[i].overlay;
 				used_old[i] = 1;
 				break;
 			}
@@ -157,12 +163,18 @@ static void refresh_screen_list_on_main()
 		scr->y = screen.frame.origin.y;
 		scr->w = screen.frame.size.width;
 		scr->h = screen.frame.size.height;
+
+		CGRect cg_frame = CGDisplayBounds(display_id);
+		scr->cg_x = cg_frame.origin.x;
+		scr->cg_y = cg_frame.origin.y;
 		scr->nr_boxes = 0;
 		scr->nr_hints = 0;
 
 		if (scr->overlay) {
 			NSRect frame = NSMakeRect(scr->x, scr->y, scr->w, scr->h);
 			[scr->overlay->win setFrame:frame display:NO];
+			[[scr->overlay->win contentView]
+			    setFrame:NSMakeRect(0, 0, scr->w, scr->h)];
 			scr->overlay->nr_hooks = 0;
 		} else {
 			scr->overlay = create_overlay_window(scr->x, scr->y,
@@ -188,6 +200,23 @@ static void refresh_screen_list()
 		dispatch_sync(dispatch_get_main_queue(), ^{
 			refresh_screen_list_on_main();
 		});
+}
+
+void osx_screen_ensure_overlay(struct screen *scr)
+{
+	if (scr->overlay)
+		return;
+
+	if ([NSThread isMainThread]) {
+		scr->overlay = create_overlay_window(scr->x, scr->y, scr->w, scr->h);
+		return;
+	}
+
+	dispatch_sync(dispatch_get_main_queue(), ^{
+		if (!scr->overlay)
+			scr->overlay = create_overlay_window(scr->x, scr->y,
+								scr->w, scr->h);
+	});
 }
 
 static void halo_draw_hook(void *arg, NSView *view)
@@ -284,6 +313,7 @@ static void ripple_draw_hook(void *arg, NSView *view)
 void osx_screen_draw_box(struct screen *scr, int x, int y, int w, int h, const char *color)
 {
 	assert(scr->nr_boxes < MAX_BOXES);
+	osx_screen_ensure_overlay(scr);
 	struct box *b = &scr->boxes[scr->nr_boxes++];
 
 	b->x = x;
@@ -304,6 +334,7 @@ int osx_screen_draw_cursor(struct screen *scr, int x, int y)
 
 	if (!load_cursor_pack(cursor_pack))
 		return 0;
+	osx_screen_ensure_overlay(scr);
 
 	scr->cursor.scr = scr;
 	scr->cursor.x = x;
@@ -409,6 +440,7 @@ void osx_screen_draw_halo(struct screen *scr, int x, int y)
 {
 	if (!config_get_int("cursor_halo_enabled"))
 		return;
+	osx_screen_ensure_overlay(scr);
 
 	scr->halo.scr = scr;
 	scr->halo.x = x;

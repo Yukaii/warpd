@@ -156,7 +156,9 @@ void osx_mouse_down(int btn)
 void osx_mouse_get_position(struct screen **_scr, int *_x, int *_y)
 {
 	size_t i;
-	NSPoint loc = [NSEvent mouseLocation];
+	CGEventRef ev = CGEventCreate(NULL);
+	CGPoint loc = CGEventGetLocation(ev);
+	CFRelease(ev);
 	int x = loc.x;
 	int y = loc.y;
 
@@ -166,14 +168,12 @@ void osx_mouse_get_position(struct screen **_scr, int *_x, int *_y)
 	for (i = 0; i < nr_screens; i++) {
 		struct screen *scr = &screens[i];
 
-		if (x >= scr->x &&
-		    x <= scr->x+scr->w &&
-		    y >= scr->y &&
-		    y <= scr->y+scr->h) {
-			x -= scr->x;
-			y -= scr->y;
-
-			y = scr->h - y;
+		if (x >= scr->cg_x &&
+		    x <= scr->cg_x+scr->w &&
+		    y >= scr->cg_y &&
+		    y <= scr->cg_y+scr->h) {
+			x -= scr->cg_x;
+			y -= scr->cg_y;
 
 			if (_x)
 				*_x = x;
@@ -196,11 +196,11 @@ void osx_mouse_get_position(struct screen **_scr, int *_x, int *_y)
 		struct screen *scr = &screens[i];
 		int dx = 0, dy = 0;
 
-		if (x < scr->x) dx = scr->x - x;
-		else if (x > scr->x + scr->w) dx = x - (scr->x + scr->w);
+		if (x < scr->cg_x) dx = scr->cg_x - x;
+		else if (x > scr->cg_x + scr->w) dx = x - (scr->cg_x + scr->w);
 
-		if (y < scr->y) dy = scr->y - y;
-		else if (y > scr->y + scr->h) dy = y - (scr->y + scr->h);
+		if (y < scr->cg_y) dy = scr->cg_y - y;
+		else if (y > scr->cg_y + scr->h) dy = y - (scr->cg_y + scr->h);
 
 		int dist = dx + dy;
 		if (dist < min_dist) {
@@ -210,15 +210,14 @@ void osx_mouse_get_position(struct screen **_scr, int *_x, int *_y)
 	}
 
 	/* Clamp to nearest screen bounds */
-	if (x < nearest->x) x = nearest->x;
-	else if (x > nearest->x + nearest->w) x = nearest->x + nearest->w;
+	if (x < nearest->cg_x) x = nearest->cg_x;
+	else if (x > nearest->cg_x + nearest->w) x = nearest->cg_x + nearest->w;
 
-	if (y < nearest->y) y = nearest->y;
-	else if (y > nearest->y + nearest->h) y = nearest->y + nearest->h;
+	if (y < nearest->cg_y) y = nearest->cg_y;
+	else if (y > nearest->cg_y + nearest->h) y = nearest->cg_y + nearest->h;
 
-	x -= nearest->x;
-	y -= nearest->y;
-	y = nearest->h - y;
+	x -= nearest->cg_x;
+	y -= nearest->cg_y;
 
 	if (_x)
 		*_x = x;
@@ -250,15 +249,15 @@ void osx_mouse_move(struct screen *scr, int x, int y)
 	else if (clamped_y > max_y)
 		clamped_y = max_y;
 
-	int global_x = clamped_x + scr->x;
-	int global_y = scr->y + max_y - clamped_y;
-	int intended_global_x = intended_x + scr->x;
-	int intended_global_y = scr->y + max_y - intended_y;
+	int global_x = clamped_x + scr->cg_x;
+	int global_y = clamped_y + scr->cg_y;
+	int intended_global_x = intended_x + scr->cg_x;
+	int intended_global_y = intended_y + scr->cg_y;
 
-	int min_global_y = scr->y;
-	int max_global_y = scr->y + max_y;
-	int min_global_x = scr->x;
-	int max_global_x = scr->x + max_x;
+	int min_global_y = scr->cg_y;
+	int max_global_y = scr->cg_y + max_y;
+	int min_global_x = scr->cg_x;
+	int max_global_x = scr->cg_x + max_x;
 
 	if (intended_global_x < min_global_x)
 		intended_global_x = min_global_x;
@@ -270,25 +269,19 @@ void osx_mouse_move(struct screen *scr, int x, int y)
 	else if (intended_global_y > max_global_y)
 		intended_global_y = max_global_y;
 
-	/*
-	 * CGEvents use a different coordinate system, so we have to convert between the
-	 * two.
-	 */
-
-	NSPoint nspos = [NSEvent mouseLocation]; //LLO global coordinate system
 	CGEventRef CGEv = CGEventCreate(NULL);
-	CGPoint cgpos = CGEventGetLocation(CGEv); //ULO global coordinate system :(
+	CGPoint cgpos = CGEventGetLocation(CGEv);
 	CFRelease(CGEv);
 
-	cgx = global_x - nspos.x + cgpos.x;
-	cgy = cgpos.y - (global_y - nspos.y);
+	cgx = global_x;
+	cgy = global_y;
 
 	/*
 	 * Calculate delta from actual cursor position to target position.
 	 * This is crucial for edge-push detection (e.g., triggering auto-hide Dock).
 	 */
-	int64_t delta_x = intended_global_x - (int)nspos.x;
-	int64_t delta_y = (int)nspos.y - intended_global_y;  /* Invert: LLO to CG delta direction */
+	int64_t delta_x = intended_global_x - (int)cgpos.x;
+	int64_t delta_y = intended_global_y - (int)cgpos.y;
 	int edge_delta_x = 0;
 	int edge_delta_y = 0;
 

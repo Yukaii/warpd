@@ -70,21 +70,24 @@ void screen_selection_mode()
 	platform->input_grab_keyboard();
 	while (1) {
 		ev = platform->input_next_event(0);
-		if (ev->pressed)
-			break;
-	}
-	platform->input_ungrab_keyboard();
+		if (!ev->pressed)
+			continue;
 
-	for (i = 0; i < n; i++) {
-		const char *key = input_event_tostr(ev);
+		char key = platform->input_code_to_qwerty(ev->code);
+		for (i = 0; i < n; i++) {
+			if (ev->mods != 0 || key != screen_chars[i])
+				continue;
 
-		if (key[0] == screen_chars[i] && key[1] == 0) {
 			int w, h;
 			platform->screen_get_dimensions(screens[i], &w, &h);
 			platform->mouse_move(screens[i], w / 2, h / 2);
 			screen_set_active(screens[i]);
+			goto selected;
 		}
 	}
+
+selected:
+	platform->input_ungrab_keyboard();
 
 	for (i = 0; i < n; i++)
 		platform->screen_clear(screens[i]);
