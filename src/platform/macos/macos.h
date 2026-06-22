@@ -86,6 +86,8 @@ struct window {
 };
 
 struct screen {
+	uint32_t display_id;
+
 	/* LLO */
 	int x;
 	int y;

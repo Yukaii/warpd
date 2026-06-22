@@ -125,6 +125,71 @@ static int load_cursor_pack(const char *cursor_pack)
 	return cursor_image != nil;
 }
 
+static void refresh_screen_list_on_main()
+{
+	struct screen old_screens[MAX_SCREENS];
+	size_t old_nr_screens = nr_screens;
+	size_t new_nr_screens = 0;
+	int used_old[MAX_SCREENS] = {0};
+
+	memcpy(old_screens, screens, sizeof(old_screens));
+	memset(screens, 0, sizeof(screens));
+
+	for (NSScreen *screen in NSScreen.screens) {
+		if (new_nr_screens >= MAX_SCREENS)
+			break;
+
+		NSDictionary *desc = screen.deviceDescription;
+		NSNumber *screen_number = desc[@"NSScreenNumber"];
+		uint32_t display_id = screen_number ? screen_number.unsignedIntValue : 0;
+		struct screen *scr = &screens[new_nr_screens];
+
+		for (size_t i = 0; i < old_nr_screens; i++) {
+			if (!used_old[i] && old_screens[i].display_id == display_id) {
+				*scr = old_screens[i];
+				used_old[i] = 1;
+				break;
+			}
+		}
+
+		scr->display_id = display_id;
+		scr->x = screen.frame.origin.x;
+		scr->y = screen.frame.origin.y;
+		scr->w = screen.frame.size.width;
+		scr->h = screen.frame.size.height;
+		scr->nr_boxes = 0;
+		scr->nr_hints = 0;
+
+		if (scr->overlay) {
+			NSRect frame = NSMakeRect(scr->x, scr->y, scr->w, scr->h);
+			[scr->overlay->win setFrame:frame display:NO];
+			scr->overlay->nr_hooks = 0;
+		} else {
+			scr->overlay = create_overlay_window(scr->x, scr->y,
+								scr->w, scr->h);
+		}
+
+		new_nr_screens++;
+	}
+
+	for (size_t i = 0; i < old_nr_screens; i++) {
+		if (!used_old[i] && old_screens[i].overlay)
+			window_hide(old_screens[i].overlay);
+	}
+
+	nr_screens = new_nr_screens;
+}
+
+static void refresh_screen_list()
+{
+	if ([NSThread isMainThread])
+		refresh_screen_list_on_main();
+	else
+		dispatch_sync(dispatch_get_main_queue(), ^{
+			refresh_screen_list_on_main();
+		});
+}
+
 static void halo_draw_hook(void *arg, NSView *view)
 {
 	struct halo *h = arg;
@@ -253,6 +318,7 @@ int osx_screen_draw_cursor(struct screen *scr, int x, int y)
 void osx_screen_list(struct screen *rscreens[MAX_SCREENS], size_t *n)
 {
 	size_t i;
+	refresh_screen_list();
 
 	for (i = 0; i < nr_screens; i++)
 		rscreens[i] = &screens[i];
@@ -376,14 +442,5 @@ int osx_has_active_entry_pulse(struct screen *scr)
 
 void macos_init_screen()
 {
-	for (NSScreen *screen in NSScreen.screens) {
-		struct screen *scr = &screens[nr_screens++];
-
-		scr->x = screen.frame.origin.x;
-		scr->y = screen.frame.origin.y;
-		scr->w = screen.frame.size.width;
-		scr->h = screen.frame.size.height;
-
-		scr->overlay = create_overlay_window(scr->x, scr->y, scr->w, scr->h);
-	}
+	refresh_screen_list();
 }
